@@ -1,0 +1,21 @@
+{
+    "index": 10,
+    "hash": "c81a01d59d21705e02b172f5676c08530d2a452eaad53ed2e7fedff5b3577e33",
+    "previous_hash": "1a9681ef726ab1919af2bb959525f73197f75add4ebe92c134ddd1c805e885a1",
+    "transactions": [
+        "Transaction <Sender: 1, Task: mnist, Accuracy: 93.91, Hash: 66ffa47931100f95f11a77903b304cb7d18b77aeb73611afe86cb92ff815d06f>",
+        "Transaction <Sender: 2, Task: mnist, Accuracy: 94.56, Hash: da3bd2de35d36301d38c4da23bba4f683fbdfb15a4f708479999fe4f587dee07>",
+        "Transaction <Sender: 3, Task: mnist, Accuracy: 94.34, Hash: 79f84a4fa14656ad1726f4a70a82010ca9a37ad2a0ffd52a57de1b39b44a52d5>",
+        "Transaction <Sender: 4, Task: mnist, Accuracy: 90.94, Hash: d5094b82130a43fe55c4bf1a02abb46f8841c2b9bb8dcf14b3971041829d122e>",
+        "Transaction <Sender: 5, Task: mnist, Accuracy: 94.27, Hash: a0994240c2a889b9fc702c5e321a305eaaa2e2115ad193f7663bd8cf2bad0c9c>",
+        "Transaction <Sender: 6, Task: mnist, Accuracy: 94.1, Hash: 081cca92a3ed991606ebf24e303c75ebd1b46196caa93e009d18462d980e6774>",
+        "Transaction <Sender: 7, Task: mnist, Accuracy: 94.02, Hash: e65a59e0a8d6e242012c31d20ec67a08baeb1be12a757c43ea9c17315067af14>",
+        "Transaction <Sender: 8, Task: mnist, Accuracy: 94.27, Hash: c94db957a13e9906a9d64ac1d541b45addaa49084954d83f199285475fbe8a08>",
+        "Transaction <Sender: 9, Task: mnist, Accuracy: 94.45, Hash: ae3aa889ecb6839cea10fd1b454b5f0443f87e76837db992dc480c169d0581ed>",
+        "Transaction <Sender: 10, Task: mnist, Accuracy: 94.59, Hash: 4da6c0ac7e64818b145e139c164bfe4f14d84e355d6bd76e78d2eb7d96553cd6>"
+    ],
+    "timestamp": 1711125881.4172344,
+    "nonce": 1530,
+    "miner_id": 7,
+    "mining_time": 1.296393632888794
+}

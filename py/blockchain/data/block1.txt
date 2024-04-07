@@ -1,0 +1,12 @@
+{
+    "index": 1,
+    "hash": "8c64cc7c6ce99d4c7364ec4771c26184bb1e84e3e8c88522e6d4f13cbb6a5c47",
+    "previous_hash": "0",
+    "transactions": [
+        "Transaction <Sender: 0, Task: mnist, Accuracy: 0.0, Hash: dee9bbc81e2c7518c84f8090c057652dbc4ac558bc21c52051bdf7a4bb285ca0>"
+    ],
+    "timestamp": 1711123574.049312,
+    "nonce": 0,
+    "miner_id": 0,
+    "mining_time": 0
+}
