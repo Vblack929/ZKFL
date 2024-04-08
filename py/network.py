@@ -1,7 +1,7 @@
 import blockchain
 import federated_learning
 from federated_learning.client import Worker, reconstruct_training_data
-from federated_learning.model import LeNet_Small, LeNet_Small_Quant
+from federated_learning.model import LeNet_Small_Quant
 from federated_learning.attacks import ModelInversion
 from copy import deepcopy
 import torch
@@ -145,5 +145,5 @@ class ZKFLChain(Network):
     
 if __name__ == '__main__':
     path = 'pretrained_model/LeNet_CIFAR_pretrained'
-    zkfl.read_model(path)
+    zkfl.generate_proof(path)
     

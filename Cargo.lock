@@ -3,38 +3,6 @@
 version = 3
 
 [[package]]
-name = "ZKFLChain"
-version = "0.1.0"
-dependencies = [
- "ark-bls12-377",
- "ark-bls12-381",
- "ark-bn254",
- "ark-crypto-primitives",
- "ark-ec",
- "ark-ed-on-bls12-377",
- "ark-ed-on-bls12-381",
- "ark-ed-on-bn254",
- "ark-ff",
- "ark-groth16",
- "ark-poly",
- "ark-poly-commit",
- "ark-r1cs-std",
- "ark-relations",
- "ark-serialize",
- "ark-sponge",
- "ark-std",
- "bencher",
- "blake2",
- "criterion",
- "fast-math",
- "num",
- "num-traits",
- "pyo3",
- "rand_chacha",
- "rand_xorshift",
-]
-
-[[package]]
 name = "ahash"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1494,4 +1462,36 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.58",
+]
+
+[[package]]
+name = "zkfl"
+version = "0.1.0"
+dependencies = [
+ "ark-bls12-377",
+ "ark-bls12-381",
+ "ark-bn254",
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ed-on-bls12-377",
+ "ark-ed-on-bls12-381",
+ "ark-ed-on-bn254",
+ "ark-ff",
+ "ark-groth16",
+ "ark-poly",
+ "ark-poly-commit",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize",
+ "ark-sponge",
+ "ark-std",
+ "bencher",
+ "blake2",
+ "criterion",
+ "fast-math",
+ "num",
+ "num-traits",
+ "pyo3",
+ "rand_chacha",
+ "rand_xorshift",
 ]

@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use std::time::Instant;
-use zkp::*;
+use read_inputs::*;
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_ff::UniformRand;
