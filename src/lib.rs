@@ -190,6 +190,8 @@ pub fn generate_proof(path: String) -> PyResult<String> {
         accuracy_squeeze.push(tmp_acc_squeeze);
     }
 
+    let accuracy = num_of_correct_prediction as f32 / x.len() as f32;
+
     let x_current_batch: Vec<Vec<Vec<Vec<u8>>>> = (&x[0..batch_size]).iter().cloned().collect();
     let true_labels_batch: Vec<u8> = (&true_labels[0..batch_size]).iter().cloned().collect();
 
@@ -310,7 +312,7 @@ pub fn generate_proof(path: String) -> PyResult<String> {
     let end = Instant::now();
     println!("verification time {:?}", end.duration_since(begin));
 
-    Ok("Model read successfully".to_string())
+    Ok(accuracy.to_string())
 }
 
 #[pymodule]

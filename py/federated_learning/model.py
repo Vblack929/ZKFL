@@ -55,10 +55,11 @@ class FLModel(torch.nn.Module):
         err = 0.0
         acc = 0.0
 
-        for b in range(n_batches):
-            logits = self.forward(x[b*B:(b+1)*B])
-            err += self.loss_fn(logits, y[b*B:(b+1)*B]).item()
-            acc += self.calc_acc(logits, y[b*B:(b+1)*B])
+        with torch.no_grad():
+            for b in range(n_batches):
+                logits = self.forward(x[b*B:(b+1)*B])
+                err += self.loss_fn(logits, y[b*B:(b+1)*B]).item()
+                acc += self.calc_acc(logits, y[b*B:(b+1)*B])
 
         return err / n_batches, acc / n_batches
 

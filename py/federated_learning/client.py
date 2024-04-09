@@ -40,6 +40,7 @@ class Worker:
         self.model = model
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
         self.quantized = False
+        self.dump_path = ''
         self.malicous = malicious
         if self.malicous:
             self.init_attacker(attack_type)
@@ -53,12 +54,15 @@ class Worker:
         
     def get_params(self):
         return self.model.get_params()
+    
+    def set_optimizer(self, optimizer):
+        self.model.set_optimizer(optimizer)
         
         
-    def init_attacker(self, attack_type=None):
-        if attack_type is None:
-            # randomly select an attack type
-            attack_type = np.random.choice(['model_inversion', 'membership_inference'])
+    # def init_attacker(self, attack_type=None):
+    #     if attack_type is None:
+    #         # randomly select an attack type
+    #         attack_type = np.random.choice(['model_inversion', 'membership_inference'])
         
         
 
@@ -79,19 +83,21 @@ class Worker:
             if k % 10 == 0:
                 print(f"Worker {self.index} local epoch {k}: loss {loss}")
                 
-    def train_step_dp(self, model, K, B, eps, delta):
+    def train_step_dp(self, model, K, B, norm, eps, delta):
         train_loader = DataLoader(self.dataset, batch_size=B, shuffle=True)
         model.to(self.device)   
         model.train()
         # create privacy engine
         privacy_engine = PrivacyEngine()
         
-        model, optim, train_loader = privacy_engine.make_private(
+        model, optim, train_loader = privacy_engine.make_private_with_epsilon(
             module=model,
             optimizer=model.optim,
             data_loader=train_loader,
-            noise_multiplier=eps,
-            max_grad_norm=delta,
+            epochs=K,
+            target_epsilon=eps,
+            target_delta=delta,
+            max_grad_norm=norm,
         )
         
         for k in range(1, K+1):
@@ -185,9 +191,8 @@ class Worker:
         self.quantized = True
 
 
-    def quantized_model_forward(self, x, dump_flag, dump_path='..zkp/pretrained_model/LeNet_CIFAR_pretrained'):
-        path = dump_path + '/worker_' + str(self.index)
-        quantized_lenet_forward(model=self.model, x=x, dump_flag=dump_flag, dump_path=path) # dump the quantized model
+    def quantized_model_forward(self, x, dump_flag, dump_path='pretrained_model/LeNet_CIFAR_pretrained'):
+        quantized_lenet_forward(model=self.model, x=x, dump_flag=dump_flag, dump_path=dump_path) # dump the quantized model
     
 # class MIAttacker(Worker):
 #     """ 
