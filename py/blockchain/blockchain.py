@@ -1,19 +1,15 @@
 import hashlib
 import time
 import json
-import copy
 import requests
 import os
-from urllib.parse import urlparse
 from typing import List
 import threading
-from .transaction import Transaction, TransactionPool
-from federated_learning.aggregator import FedAvg
-from federated_learning.utils import numpy_dict_to_model, model_to_numpy_dict
+from .transaction import Transaction
 
 
 class Block:
-    def __init__(self, index: int, transactions: List[Transaction], timestamp: float, previous_hash: str, global_params: dict = None):
+    def __init__(self, index: int, transactions: List[Transaction], timestamp: float, previous_hash: str, global_params: list):
         """ 
         Constructor for the `Block` class.
         :param index: Unique ID of the block.
@@ -58,14 +54,14 @@ class Block:
 
 
 class Blockchain:
-    def __init__(self, consensus="pow", max_nodes=10, model_struct=None, task='mnist', save_path="blockchain/data"):
+    def __init__(self, consensus, max_nodes, model, task, save_path):
         """ 
         Constructor for the `Blockchain` class. 
         """
         self.chain = []
         self.consensus = consensus
         self.max_nodes = max_nodes
-        self.model_struct = model_struct
+        self.model = model
         self.task = task
         self.save_path = save_path
         self.peers = set()
@@ -79,21 +75,20 @@ class Blockchain:
         Method to create the first block in the chain.
         """
         # convert base model to transaction
-        global_model = self.model_struct
+        global_params = self.model.get_params()
         first_tx = Transaction(
             sender_id="0",
             task=self.task,
-            model=global_model,
-            model_params=None,
+            params=global_params,
             accuracy=0.0,
             timestamp=time.time()
         )
         return Block(
-            index=1,
+            index=0,
             transactions=[first_tx],
             timestamp=time.time(),
             previous_hash="0",
-            global_params=model_to_numpy_dict(global_model)
+            global_params=global_params
         )
 
     def register_client(self, client):
@@ -170,16 +165,6 @@ class Blockchain:
 
     def add_block(self, block):
         self.chain.append(block)
-
-    def aggregate_models(self, block):
-        aggregator = FedAvg()
-        local_params = []
-        for tx in block.transactions:
-            local_params.append(tx.model_params)
-
-        aggregated_params = aggregator.aggregate(local_params)
-        block.global_params = aggregated_params
-        print("Local models aggregated.")
         
     def sort_transactions(self):
         """ 

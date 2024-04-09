@@ -140,52 +140,136 @@ class DataFeeder():
             x = self.transform(x)
 
         return x, y
-
-
-def load_cifar10(num_users, n_class, n_samples, even_split=True):
-    """ 
-    Returns (X_train, y_train), (X_test, y_test) where X_train and y_train are lists of length num_users
     
-    Args:
-    - num_users:    {int} number of users to split the data into
-    - n_class:      {int} number of classes for each user
-    - n_samples:    {int} number of samples for each user
-    - even_split:   {bool} whether to split the data evenly among users
+def load_cifar10(num_users, n_class, n_samples, rate_unbalance):
     """
-    data_dir = 'data'
+    This non-i.i.d cifar10 is implemented from
+    https://github.com/jeremy313/non-iid-dataset-for-personalized-federated-learning
+    the official implementation of the non-iid dataset in "LotteryFL: Personalized and
+    Communication-Efficient Federated Learning with Lottery Ticket Hypothesis on Non-IID Datasets".
+    Args:
+    - num_users:        {int} the number of workers
+    - n_class:          {int} the number of image classes each client has
+    - n_samples:        {int{ the number of samples per class distributed to clients
+    - rate_unbalance:   {float} unbalance rate of cifar10 data, (0-1) 1 denotes balanced
+    """
+    data_dir = '../data/CIFAR10_data/'
     apply_transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
-    train_dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=apply_transform)
-    test_dataset = datasets.CIFAR10(data_dir, train=False, download=True, transform=apply_transform)
+        [transforms.ToTensor(),
+         transforms.Pad(4),
+         transforms.RandomHorizontalFlip(),
+         transforms.RandomCrop(32),
+         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    train_dataset = datasets.CIFAR10(data_dir, train=True, download=True,
+                                     transform=apply_transform)
+
+    test_dataset = datasets.CIFAR10(data_dir, train=False, download=True,
+                                    transform=apply_transform)
+
+    test_imgs, test_labels = test_dataset.data, test_dataset.targets
+    train_imgs, train_labels = train_dataset.data, train_dataset.targets
+
+    # transpose (rather than reshape) required to get actual order of
+    # data in ndarray to change. If reshape is used, when data is
+    # passed to a torchvision.transform, then the resulting images come
+    # out incorrectly.
+    train_imgs = [np.transpose(imgs, (2, 0, 1)) for imgs in train_imgs]
+    test_imgs = [np.transpose(imgs, (2, 0, 1)) for imgs in test_imgs]
+
+    # Chose euqal splits for every user
+    num_shards_train, num_imgs_train = int(50000 / n_samples), n_samples
+    num_classes = 10
+    assert (n_class * num_users <= num_shards_train)
+    assert (n_class <= num_classes)
+    idx_shard = [i for i in range(num_shards_train)]
+    dict_users_train = {i: np.array([]) for i in range(num_users)}
+    idxs = np.arange(num_shards_train * num_imgs_train)
+
+    labels = train_labels
+    # labels_test_raw = np.array(test_dataset.targets)
+
+    # sort labels
+    idxs_labels = np.vstack((idxs, labels))
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
+    labels = idxs_labels[1, :]
+
+    # divide and assign
+    for i in range(num_users):
+        user_labels = np.array([])
+        rand_set = set(np.random.choice(idx_shard, n_class, replace=False))
+        idx_shard = list(set(idx_shard) - rand_set)
+        unbalance_flag = 0
+        for rand in rand_set:
+            if unbalance_flag == 0:
+                dict_users_train[i] = np.concatenate(
+                    (dict_users_train[i], idxs[rand * num_imgs_train:(rand + 1) * num_imgs_train]), axis=0)
+                user_labels = np.concatenate((user_labels, labels[rand * num_imgs_train:(rand + 1) * num_imgs_train]),
+                                             axis=0)
+            else:
+                dict_users_train[i] = np.concatenate(
+                    (dict_users_train[i], idxs[rand * num_imgs_train:int((rand + rate_unbalance) * num_imgs_train)]),
+                    axis=0)
+                user_labels = np.concatenate(
+                    (user_labels, labels[rand * num_imgs_train:int((rand + rate_unbalance) * num_imgs_train)]), axis=0)
+            unbalance_flag = 1
+
+    train_xs, train_ys = [], []
+    train_imgs = np.array(train_imgs)
+    train_labels = np.array(train_labels)
+    for key in dict_users_train.keys():
+        idx = dict_users_train[key].astype(int)
+        train_x = train_imgs[idx]
+        train_y = train_labels[idx]
+        train_xs.append(train_x)
+        train_ys.append(train_y)
+
+    return (train_xs, train_ys), (np.array(test_imgs), np.array(test_labels))
+
+# def load_cifar10(num_users, n_class, n_samples, even_split=True):
+#     """ 
+#     Returns (X_train, y_train), (X_test, y_test) where X_train and y_train are lists of length num_users
     
-    assert num_users * n_class * n_samples <= len(train_dataset), "Not enough data for the given parameters"
+#     Args:
+#     - num_users:    {int} number of users to split the data into
+#     - n_class:      {int} number of classes for each user
+#     - n_samples:    {int} number of samples for each user
+#     - even_split:   {bool} whether to split the data evenly among users
+#     """
+#     data_dir = 'data'
+#     apply_transform = transforms.Compose(
+#         [transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+#     train_dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=apply_transform)
+#     test_dataset = datasets.CIFAR10(data_dir, train=False, download=True, transform=apply_transform)
     
-    # shuffle the data before distributing it
-    indices = np.random.permutation(len(train_dataset))
+#     assert num_users * n_class * n_samples <= len(train_dataset), "Not enough data for the given parameters"
     
-    X_train, y_train = train_dataset.data[indices], np.array(train_dataset.targets)[indices]
-    X_test, y_test = test_dataset.data, np.array(test_dataset.targets)
+#     # shuffle the data before distributing it
+#     indices = np.random.permutation(len(train_dataset))
     
-    # transpose the data to be in the form (n_samples, n_channels, height, width)
-    X_train = np.transpose(X_train, (0, 3, 1, 2))
-    X_test = np.transpose(X_test, (0, 3, 1, 2))
+#     X_train, y_train = train_dataset.data[indices], np.array(train_dataset.targets)[indices]
+#     X_test, y_test = test_dataset.data, np.array(test_dataset.targets)
     
-    X_train_split = []
-    y_train_split = []
-    if even_split:
-        for k in range(num_users):
-            X_train_split.append(X_train[k * n_class * n_samples:(k + 1) * n_class * n_samples])
-            y_train_split.append(y_train[k * n_class * n_samples:(k + 1) * n_class * n_samples])
-    else:
-        num_samples_per_user = np.random.multinomial(n_samples, np.ones(num_users) / num_users)
-        start = 0
-        for num_samples in num_samples_per_user:
-            end = start + num_samples
-            X_train_split.append(X_train[start:end])
-            y_train_split.append(y_train[start:end])
-            start = end
+#     # transpose the data to be in the form (n_samples, n_channels, height, width)
+#     X_train = np.transpose(X_train, (0, 3, 1, 2))
+#     X_test = np.transpose(X_test, (0, 3, 1, 2))
     
-    return (X_train_split, y_train_split), (X_test, y_test)
+#     X_train_split = []
+#     y_train_split = []
+#     if even_split:
+#         for k in range(num_users):
+#             X_train_split.append(X_train[k * n_class * n_samples:(k + 1) * n_class * n_samples])
+#             y_train_split.append(y_train[k * n_class * n_samples:(k + 1) * n_class * n_samples])
+#     else:
+#         num_samples_per_user = np.random.multinomial(n_samples, np.ones(num_users) / num_users)
+#         start = 0
+#         for num_samples in num_samples_per_user:
+#             end = start + num_samples
+#             X_train_split.append(X_train[start:end])
+#             y_train_split.append(y_train[start:end])
+#             start = end
+    
+#     return (X_train_split, y_train_split), (X_test, y_test)
 
 def to_tensor(x, device, dtype):
     """

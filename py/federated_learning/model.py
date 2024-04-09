@@ -6,11 +6,74 @@ import torch.nn.functional as F
 from torch.autograd import grad
 
 
+class FLModel(torch.nn.Module):
+    def __init__(self, device):
+        super(FLModel, self).__init__()
+        self.device = device
+        self.optim = None
+        self.loss_fn = None
+
+    def set_optimizer(self, optim):
+        self.optim = optim
+
+    def get_params(self):
+        return [np.copy(p.data.cpu().numpy()) for p in list(self.parameters())]
+
+    def set_params(self, params):
+        """Set the model parameters to the given values.
+
+        Args:
+            params : List of numpy arrays containing the model parameters.
+        """
+        with torch.no_grad():
+            for p, p_new in zip(self.parameters(), params):
+                p.copy_(torch.tensor(p_new))
+
+    def forward(self, x):
+        pass
+
+    def calc_acc(self, x):
+        pass
+
+    def train_step(self, x, y):
+        logits = self.forward(x)
+        loss = self.loss_fn(logits, y)
+        acc = self.calc_acc(logits, y)
+        self.optim.zero_grad()
+        loss.backward()
+        self.optim.step()
+        return loss.item(), acc
+
+    def eval_step(self, x, y, B):
+        """ 
+        Args:
+            x: input data   {torch.tensor}
+            y: target labels {torch.tensor}
+            B: batch size   {int}
+        """
+        n_batches = int(np.ceil(x.shape[0] / B))
+        err = 0.0
+        acc = 0.0
+
+        for b in range(n_batches):
+            logits = self.forward(x[b*B:(b+1)*B])
+            err += self.loss_fn(logits, y[b*B:(b+1)*B]).item()
+            acc += self.calc_acc(logits, y[b*B:(b+1)*B])
+
+        return err / n_batches, acc / n_batches
 
 
-class LeNet_Small_Quant(nn.Module):
+class LeNet_Small_Quant(FLModel):
+    """
+    Lenet model with 3 convolutional layers and 2 fully connected layers 
+    for CIFAR-10 dataset. The model is quantized using PyTorch's quantization
+    """
+
     def __init__(self):
-        super(LeNet_Small_Quant, self).__init__()
+        device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+        super(LeNet_Small_Quant, self).__init__(device=device)
+        self.loss_fn = nn.CrossEntropyLoss(reduction='mean')
+
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=6,
                                kernel_size=5, stride=1, bias=False)
         self.act1 = nn.ReLU()
@@ -28,12 +91,7 @@ class LeNet_Small_Quant(nn.Module):
         self.linear2 = nn.Linear(in_features=84, out_features=10)
         self.quant = QuantStub()
         self.dequant = DeQuantStub()
-    
-    @staticmethod
-    def weights_init(m):
-        if hasattr(m, "weight"):
-            m.weight.data.unifor_(-0.5, 0.5)
-            
+
 
     def forward(self, x):
         x = self.quant(x)
@@ -51,6 +109,9 @@ class LeNet_Small_Quant(nn.Module):
         x = self.linear2(x)
         x = self.dequant(x)
         return x
+
+    def calc_acc(self, logits, y):
+        return torch.mean((torch.argmax(logits, dim=1) == y).float()).item()
 
     def dump_feat_param(self):
         dummy_image = torch.tensor(np.ones((1, 3, 32, 32))).float()
@@ -107,7 +168,7 @@ class LeNet_Small(nn.Module):
         self.linear1 = nn.Linear(in_features=480, out_features=84)
         self.act4 = nn.ReLU()
         self.linear2 = nn.Linear(in_features=84, out_features=10)
-    
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.act1(x)
@@ -122,14 +183,14 @@ class LeNet_Small(nn.Module):
         x = self.act4(x)
         x = self.linear2(x)
         return x
-    
-    
+
+
 class mlleaks_mlp(nn.Module):
     def __init__(self, n_in=3, n_out=1, n_hidden=64):
         super(mlleaks_mlp, self).__init__()
         self.hidden = nn.Linear(n_in, n_hidden)
         self.out = nn.Linear(n_hidden, n_out)
-        
+
     def forward(self, x):
         x = F.sigmoid(self.hidden(x))
         out = self.out(x)
