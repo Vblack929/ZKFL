@@ -42,8 +42,6 @@ class Worker:
         self.quantized = False
         self.dump_path = ''
         self.malicous = malicious
-        if self.malicous:
-            self.init_attacker(attack_type)
 
     def set_params(self, new_params):
         """ 

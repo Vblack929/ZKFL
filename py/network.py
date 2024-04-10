@@ -36,7 +36,7 @@ class Network():
         self.X_test, self.y_test = X_test, y_test
         if model.lower() == 'lenet':
             self.global_model = LeNet_Small_Quant()
-        self.path = "../chains/" + self.consensus + "/"
+        self.path = "chains" + self.consensus + "/"
 
     def init_network(self, clear_path=False):
         path = self.path
@@ -68,6 +68,7 @@ class POFLNetWork(Network):
     def run(self):
         # init workers
         self.workers = []
+        global_accuracy = []
         X_test, y_test = self.X_test[:1000], self.y_test[:1000] # public test set
         for i in range(self.num_clients):
             if i <= self.num_malicous:
@@ -145,6 +146,7 @@ class POFLNetWork(Network):
             _, gloabl_acc = leader.evaluate(model=leader.model, x=X_test, y=y_test, B=64)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
+            global_accuracy.append(gloabl_acc)
             # append block to blockchain
             self.blockchain.add_block(new_block)
             if not self.blockchain.valid_chain:
@@ -152,7 +154,14 @@ class POFLNetWork(Network):
                 break
             self.blockchain.store_block(new_block)
             self.blockchain.empty_transaction_pool()
-    
+        
+        # save the global accuracy as txt
+        np.savetxt(self.blockchain.save_path + '/global_accuracy.txt', np.array(global_accuracy))
+
+        plt.plot(global_accuracy)
+        plt.xlabel("Global rounds")
+        plt.ylabel("Global accuracy")
+        plt.show()
             
             
     def local_train(self, B):
@@ -272,7 +281,7 @@ class ZKFLChain(Network):
 if __name__ == '__main__':
     network = POFLNetWork(
         num_clients=5,
-        global_rounds=10,
+        global_rounds=50,
         local_rounds=20,
         frac_malicous=0.0,
         dataset='cifar10',
