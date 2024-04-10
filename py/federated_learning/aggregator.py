@@ -16,6 +16,9 @@ class FedAvg:
         """ 
         Method to aggregate the local updates from the workers.
         :param local_updates: List of dictionaries of numpy arrays representing the local updates.
+        
+        Returns:
+        new_params: List of numpy arrays representing the new global model parameters.
         """
         self.local_params = local_params
         
@@ -29,6 +32,6 @@ class FedAvg:
         # for i, p in enumerate(self.params):
         #     self.params[i] += self.lr * round_agg[i]
         # self.global_model.set_params(self.params)
-        self.global_model.set_params(round_agg)
-        return self.global_model
+        # self.global_model.set_params(round_agg)
+        return round_agg
         
