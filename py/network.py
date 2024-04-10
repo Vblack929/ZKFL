@@ -143,7 +143,7 @@ class POFLNetWork(Network):
             # aggregate
             print("Start aggregation")
             agg = federated_learning.FedAvg(global_model=self.global_model, beta=0.9, lr=0.1)
-            new_global_params = agg.aggregate(local_params=[tx.params for tx in new_block.transactions]).get_params()
+            new_global_params = agg.aggregate(local_params=[tx.params for tx in new_block.transactions])
             # eval global model
             leader.model.set_params(new_global_params)
             _, gloabl_acc = leader.evaluate(model=leader.model, x=X_test, y=y_test, B=64)
@@ -312,11 +312,11 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(global_model=global_model, beta=0.9, lr=0.1)
-        new_global_model = agg.aggregate(local_params=local_params)
-        _, acc = new_global_model.eval_step(x=X_test, y=y_test, B=64)
+        new_global_params = agg.aggregate(local_params=local_params)
+        global_model.set_params(new_global_params)
+        _, acc = global_model.eval_step(x=X_test, y=y_test, B=64)
         print(f"Global round {i}: accuracy {acc}")
         global_accuracy.append(acc)
-        global_model.set_params(new_global_model.get_params())
     
     # plot the global accuracy
     plt.plot(global_accuracy)
