@@ -7,6 +7,7 @@ import torch
 from torchvision import datasets, transforms
 import numpy as np
 import matplotlib.pyplot as plt
+from opacus import PrivacyEngine
 
 import zkfl
 import blockchain
@@ -60,19 +61,22 @@ class Network():
         # initialize the blockchain
         self.blockchain = blockchain.Blockchain(consensus=self.consensus, max_nodes=self.num_clients, model=self.global_model,
                                                 task='cifar10', save_path=path)
-            
+
+
 class POFLNetWork(Network):
     def __init__(self, num_clients: int, global_rounds: int, local_rounds: int, frac_malicous: float,
                  dataset: str, model: str):
-        super().__init__(num_clients, global_rounds, local_rounds, frac_malicous, dataset, model)
+        super().__init__(num_clients, global_rounds,
+                         local_rounds, frac_malicous, dataset, model)
         self.consesus = 'pofl'
         self.init_network(clear_path=False)
-        
+
     def run(self):
         # init workers
         self.workers = []
         global_accuracy = []
-        X_test, y_test = self.X_test[:1000], self.y_test[:1000] # public test set
+        # public test set
+        X_test, y_test = self.X_test[:1000], self.y_test[:1000]
         for i in range(self.num_clients):
             if i <= self.num_malicous:
                 worker = Worker(index=i+1,
@@ -91,8 +95,7 @@ class POFLNetWork(Network):
                                 model=LeNet_Small_Quant(),
                                 malicious=False)
             self.workers.append(worker)
-            
-        
+
         for i in range(1, self.global_rounds+1):
             print(f"Global round {i}")
             # workers load global params from the last block
@@ -105,9 +108,10 @@ class POFLNetWork(Network):
             print("Local training done")
             # evaluate and send tx
             for worker in self.workers:
-                _, acc = worker.evaluate(model=worker.model, x=X_test, y=y_test, B=64)
+                _, acc = worker.evaluate(
+                    model=worker.model, x=X_test, y=y_test, B=64)
                 update = worker.local_update(acc=acc)
-                worker.send_tx(update, self.blockchain.transaction_pool) 
+                worker.send_tx(update, self.blockchain.transaction_pool)
             print("Transactions sent")
             # eval update
             print("Start eval update")
@@ -117,36 +121,44 @@ class POFLNetWork(Network):
                 params = tx.params
                 for worker in self.workers:
                     worker.set_params(params)
-                    _, acc = worker.evaluate(model=worker.model, x=X_test, y=y_test, B=64)
+                    _, acc = worker.evaluate(
+                        model=worker.model, x=X_test, y=y_test, B=64)
                     if acc == tx.accuracy:
-                        print(f"transaction from worker {tx.sender_id} verified by worker {worker.index}")
+                        print(
+                            f"transaction from worker {tx.sender_id} verified by worker {worker.index}")
                         vote += 1
                     else:
-                        print(f"transaction from worker {tx.sender_id} rejected by worker {worker.index}")
+                        print(
+                            f"transaction from worker {tx.sender_id} rejected by worker {worker.index}")
                 if vote == len(self.workers):
                     tx.verified = True
-                    print(f"transaction from worker {tx.sender_id} verified by all workers")
+                    print(
+                        f"transaction from worker {tx.sender_id} verified by all workers")
                     # worker who sent this tx becomes the leader
                     leader_id = tx.sender_id
                     print(f"worker {leader_id} is the leader")
                     break
-            
-            leader = [worker for worker in self.workers if worker.index == leader_id][0]
+
+            leader = [
+                worker for worker in self.workers if worker.index == leader_id][0]
             # leader perform aggregation
             new_block = blockchain.Block(index=len(self.blockchain),
-                                        transactions=self.blockchain.transaction_pool,
-                                        timestamp=time.time(),
-                                        previous_hash=self.blockchain.last_block.hash,
-                                        global_params=None,
-                                        )
+                                         transactions=self.blockchain.transaction_pool,
+                                         timestamp=time.time(),
+                                         previous_hash=self.blockchain.last_block.hash,
+                                         global_params=None,
+                                         )
             new_block.miner_id = leader_id
             # aggregate
             print("Start aggregation")
-            agg = federated_learning.FedAvg(global_model=self.global_model, beta=0.9, lr=0.1)
-            new_global_params = agg.aggregate(local_params=[tx.params for tx in new_block.transactions])
+            agg = federated_learning.FedAvg(
+                global_model=self.global_model, beta=0.9, lr=0.1)
+            new_global_params = agg.aggregate(
+                local_params=[tx.params for tx in new_block.transactions])
             # eval global model
             leader.model.set_params(new_global_params)
-            _, gloabl_acc = leader.evaluate(model=leader.model, x=X_test, y=y_test, B=64)
+            _, gloabl_acc = leader.evaluate(
+                model=leader.model, x=X_test, y=y_test, B=64)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
             global_accuracy.append(gloabl_acc)
@@ -157,19 +169,20 @@ class POFLNetWork(Network):
                 break
             self.blockchain.store_block(new_block)
             self.blockchain.empty_transaction_pool()
-        
+
         # save the global accuracy as txt
-        np.savetxt(self.blockchain.save_path + '/global_accuracy.txt', np.array(global_accuracy))
+        np.savetxt(self.blockchain.save_path +
+                   '/global_accuracy.txt', np.array(global_accuracy))
 
         plt.plot(global_accuracy)
         plt.xlabel("Global rounds")
         plt.ylabel("Global accuracy")
         plt.show()
-            
-            
+
     def local_train(self, B):
         for worker in self.workers:
-            worker.model.set_optimizer(torch.optim.Adam(worker.model.parameters(), lr=0.001))
+            worker.model.set_optimizer(torch.optim.Adam(
+                worker.model.parameters(), lr=0.001))
             worker.train_step_dp(
                 model=worker.model,
                 K=self.local_rounds,
@@ -178,19 +191,20 @@ class POFLNetWork(Network):
                 eps=50.0,
                 delta=1e-5,
             )
-        
-        
-            
+
+
 class ZKFLChain(Network):
     def __init__(self, num_clients: int, global_rounds: int, local_rounds: int, frac_malicous: float,
                  dataset: str, model: str):
-        super().__init__(num_clients, global_rounds, local_rounds, frac_malicous, dataset, model)
+        super().__init__(num_clients, global_rounds,
+                         local_rounds, frac_malicous, dataset, model)
         self.consesus = 'zkfl'
         self.log = {}
-        
+
     def run(self):
         self.workers = []
-        X_test, y_test = self.X_test[:1000], self.y_test[:1000] # public test set
+        # public test set
+        X_test, y_test = self.X_test[:1000], self.y_test[:1000]
         for i in range(self.num_clients):
             if i <= self.num_malicous:
                 worker = Worker(index=i+1,
@@ -209,7 +223,7 @@ class ZKFLChain(Network):
                                 model=LeNet_Small_Quant(),
                                 malicious=False)
             self.workers.append(worker)
-            
+
         for i in range(1, self.global_rounds+1):
             print(f"Global round {i}")
             # workers load global params from the last block
@@ -230,7 +244,8 @@ class ZKFLChain(Network):
                         os.remove(file_path)
                 else:
                     os.makedirs(dump_path)
-                worker.quantized_model_forward(x=X_test, dump_flag=True, dump_path=dump_path)
+                worker.quantized_model_forward(
+                    x=X_test, dump_flag=True, dump_path=dump_path)
                 worker.dump_path = dump_path
 
             # eval and generate proof
@@ -238,23 +253,27 @@ class ZKFLChain(Network):
                 acc = zkfl.generate_proof(worker.dump_path)
                 update = worker.local_update(acc=acc)
                 worker.send_tx(update, self.blockchain.transaction_pool)
-            
+
             self.blockchain.sort_transactions()
             leader_id = self.blockchain.transaction_pool[0].sender_id
-            leader = [worker for worker in self.workers if worker.index == leader_id][0]
+            leader = [
+                worker for worker in self.workers if worker.index == leader_id][0]
             # leader perform aggregation
             new_block = blockchain.Block(index=len(self.blockchain),
-                                        transactions=self.blockchain.transaction_pool,
-                                        timestamp=time.time(),
-                                        previous_hash=self.blockchain.last_block.hash,
-                                        global_params=None,
-                                        )
+                                         transactions=self.blockchain.transaction_pool,
+                                         timestamp=time.time(),
+                                         previous_hash=self.blockchain.last_block.hash,
+                                         global_params=None,
+                                         )
             new_block.miner_id = leader_id
-            agg = federated_learning.FedAvg(global_model=self.global_model, beta=0.9, lr=0.1)
-            new_global_params = agg.aggregate(local_params=[tx.params for tx in new_block.transactions]).get_params()
+            agg = federated_learning.FedAvg(
+                global_model=self.global_model, beta=0.9, lr=0.1)
+            new_global_params = agg.aggregate(
+                local_params=[tx.params for tx in new_block.transactions]).get_params()
             # eval global model
             leader.model.set_params(new_global_params)
-            _, gloabl_acc = leader.evaluate(model=leader.model, x=X_test, y=y_test, B=64)
+            _, gloabl_acc = leader.evaluate(
+                model=leader.model, x=X_test, y=y_test, B=64)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
             # append block to blockchain
@@ -264,16 +283,17 @@ class ZKFLChain(Network):
                 break
             self.blockchain.store_block(new_block)
             self.blockchain.empty_transaction_pool()
-                
-            
+
     def local_train(self, B):
         for worker in self.workers:
-            worker.set_optimizer(torch.optim.Adam(worker.model.parameters(), lr=0.001))
+            worker.set_optimizer(torch.optim.Adam(
+                worker.model.parameters(), lr=0.001))
             worker.train_step(
                 model=worker.model,
                 K=self.local_rounds,
                 B=B
             )
+
 
 def vanillia_fl(num_clients, global_rounds, local_rounds):
     """ 
@@ -294,10 +314,10 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                         X_test=None,
                         y_test=None,
                         model=LeNet_Small_Quant(),
-        )
+                        )
         workers.append(worker)
-        
-    global_model = LeNet_Small_Quant() 
+
+    global_model = LeNet_Small_Quant()
     global_accuracy = []
     for i in range(1, global_rounds+1):
         global_params = global_model.get_params()
@@ -311,35 +331,39 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                 B=128
             )
             local_params.append(w.get_params())
-        agg = federated_learning.FedAvg(global_model=global_model, beta=0.9, lr=0.1)
+        agg = federated_learning.FedAvg(
+            global_model=global_model, beta=0.9, lr=0.1)
         new_global_params = agg.aggregate(local_params=local_params)
         global_model.set_params(new_global_params)
         _, acc = global_model.eval_step(x=X_test, y=y_test, B=64)
         print(f"Global round {i}: accuracy {acc}")
         global_accuracy.append(acc)
-    
+
     # plot the global accuracy
     plt.plot(global_accuracy)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
 
+
 def centralized_training(rounds):
     data_dir = '../data/CIFAR10_data/'
     apply_transform = transforms.Compose(
         [transforms.ToTensor(),
-        transforms.Pad(4),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomCrop(32),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+         transforms.Pad(4),
+         transforms.RandomHorizontalFlip(),
+         transforms.RandomCrop(32),
+         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
     train_dataset = datasets.CIFAR10(data_dir, train=True, download=True,
-                                    transform=apply_transform)
+                                     transform=apply_transform)
 
     test_dataset = datasets.CIFAR10(data_dir, train=False, download=True,
                                     transform=apply_transform)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=128, shuffle=False)
-    
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=128, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=128, shuffle=False)
+
     model = LeNet_Small_Quant()
     model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.001))
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
@@ -364,7 +388,7 @@ def centralized_training(rounds):
         train_loss.append(loss_round)
         if k % 10 == 0:
             print(f"train epoch {k}: loss {loss}")
-        
+
         # eval
         model.eval()
         loss = 0.0
@@ -387,37 +411,113 @@ def centralized_training(rounds):
     ax1.set_ylabel('Loss', color='tab:red')
     ax1.plot(train_loss, color='tab:red')
     ax1.tick_params(axis='y', labelcolor='tab:red')
-    
+
     ax2 = ax1.twinx()
     ax2.set_ylabel('Accuracy', color='tab:blue')
     ax2.plot(train_acc, color='tab:blue')
     ax2.tick_params(axis='y', labelcolor='tab:blue')
-    
+
     fig.tight_layout()
     plt.show()
-    
+
     # plot the test loss and accuracy in the same figure
     fig, ax1 = plt.subplots()
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Loss', color='tab:red')
     ax1.plot(test_loss, color='tab:red')
     ax1.tick_params(axis='y', labelcolor='tab:red')
-    
+
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Accuracy', color='tab:blue')    
+    ax2.set_ylabel('Accuracy', color='tab:blue')
     ax2.plot(test_acc, color='tab:blue')
     ax2.tick_params(axis='y', labelcolor='tab:blue')
-    
+
     fig.tight_layout()
     plt.show()
-    
-    
+
+
+def centralized_dp(rounds: int):
+    data_dir = 'data/CIFAR10_data/'
+    apply_transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Pad(4),
+         transforms.RandomHorizontalFlip(),
+         transforms.RandomCrop(32),
+         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    train_dataset = datasets.CIFAR10(data_dir, train=True, download=True,
+                                     transform=apply_transform)
+
+    test_dataset = datasets.CIFAR10(data_dir, train=False, download=True,
+                                    transform=apply_transform)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=128, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=128, shuffle=False)
+
+    model = LeNet_Small_Quant()
+    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.0001))
+    device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
+
+    model.to(device)
+    privacy_engine = PrivacyEngine()
+
+    model, optim, train_loader = privacy_engine.make_private_with_epsilon(
+        module=model,
+        optimizer=model.optim,
+        data_loader=train_loader,
+        epochs=rounds,
+        target_epsilon=50.0,
+        target_delta=1e-5,
+        max_grad_norm=1.2,
+    )
+
+    test_loss = []
+    test_acc = []
+    for k in range(1, rounds+1):
+        model.train()
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
+        losses = []
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            optim.zero_grad()
+            output = model(x)
+            loss = loss_fn(output, y)
+            loss.backward()
+            optim.step()
+            losses.append(loss.item())
+
+        print(f"epoch {k}: loss {np.mean(losses)}")
+
+        # eval
+        model.eval()
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
+        loss = 0.0
+        acc = 0.0
+        with torch.no_grad():
+            for x, y in test_loader:
+                x, y = x.to(device), y.to(device)
+                output = model(x)
+                loss += loss_fn(output, y)
+                
+                preds = np.argmax(output.detach().cpu().numpy(), axis=1)
+                labels = y.detach().cpu().numpy()
+                acc += np.sum(preds == labels)
+                
+        loss /= len(test_loader)
+        acc /= len(test_loader)
+        test_loss.append(loss.item())
+        test_acc.append(acc)
         
-            
-        
-        
-    
+        print(f"test epoch {k}: loss {loss}, acc {acc}")
+
+    # plot the test accuracy
+    plt.plot(test_acc)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+
 if __name__ == '__main__':
-    vanillia_fl(num_clients=5, global_rounds=20, local_rounds=20)
-    
-    
+    path = 'pretrained_model/LeNet_CIFAR_pretrained'
+    acc = zkfl.generate_proof(path) 
+    print(acc)
