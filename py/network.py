@@ -36,7 +36,7 @@ class Network():
         self.X_test, self.y_test = X_test, y_test
         if model.lower() == 'lenet':
             self.global_model = LeNet_Small_Quant()
-        self.path = "chains" + self.consensus + "/"
+        self.path = "../chains" + self.consensus + "/"
 
     def init_network(self, clear_path=False):
         path = self.path
@@ -263,9 +263,6 @@ class ZKFLChain(Network):
             self.blockchain.empty_transaction_pool()
                 
             
-                
-            
-    
     def local_train(self, B):
         for worker in self.workers:
             worker.set_optimizer(torch.optim.Adam(worker.model.parameters(), lr=0.001))
@@ -274,6 +271,55 @@ class ZKFLChain(Network):
                 K=self.local_rounds,
                 B=B
             )
+
+def vanillia_fl(num_clients, global_rounds, local_rounds):
+    """ 
+    A simple federated learning network with no malicious clients.
+    """
+    (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
+                                                                           n_class=10,
+                                                                           n_samples=1000,
+                                                                           rate_unbalance=1.0,
+                                                                           )
+    workers = []
+    for i in range(num_clients):
+        worker = Worker(index=i+1,
+                        X_train=X_train[i],
+                        y_train=y_train[i],
+                        X_test=None,
+                        y_test=None,
+                        model=LeNet_Small_Quant(),
+        )
+        workers.append(worker)
+        
+    global_model = LeNet_Small_Quant() 
+    global_accuracy = []
+    for i in range(1, global_rounds+1):
+        global_params = global_model.get_params()
+        local_params = []
+        for w in workers:
+            w.set_params(global_params)
+            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.001))
+            w.train_step(
+                model=w.model,
+                K=local_rounds,
+                B=128
+            )
+            local_params.append(w.get_params())
+        agg = federated_learning.FedAvg(global_model=global_model, beta=0.9, lr=0.1)
+        new_global_model = agg.aggregate(local_params=local_params)
+        _, acc = new_global_model.eval_step(x=X_test, y=y_test, B=64)
+        print(f"Global round {i}: accuracy {acc}")
+        global_accuracy.append(acc)
+        global_model.set_params(new_global_model.get_params())
+    
+    # plot the global accuracy
+    plt.plot(global_accuracy)
+    plt.xlabel("Global rounds")
+    plt.ylabel("Global accuracy")
+    plt.show()
+            
+    
             
         
         
