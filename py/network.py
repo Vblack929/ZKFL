@@ -284,6 +284,8 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                                                                            n_samples=1000,
                                                                            rate_unbalance=1.0,
                                                                            )
+    X_test = torch.tensor(X_test).float()
+    y_test = torch.tensor(y_test).long()
     workers = []
     for i in range(num_clients):
         worker = Worker(index=i+1,
@@ -302,7 +304,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
         local_params = []
         for w in workers:
             w.set_params(global_params)
-            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.001))
+            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.005))
             w.train_step(
                 model=w.model,
                 K=local_rounds,
@@ -375,7 +377,7 @@ def centralized_training(rounds):
                 acc += model.calc_acc(output, y)
         loss /= len(test_loader)
         acc /= len(test_loader)
-        test_loss.append(loss)
+        test_loss.append(loss.item())
         test_acc.append(acc)
         if k % 10 == 0:
             print(f"test epoch {k}: loss {loss}, acc {acc}")
@@ -416,14 +418,6 @@ def centralized_training(rounds):
         
     
 if __name__ == '__main__':
-    network = POFLNetWork(
-        num_clients=5,
-        global_rounds=50,
-        local_rounds=20,
-        frac_malicous=0.0,
-        dataset='cifar10',
-        model='lenet'
-    )
-    network.run()
+    vanillia_fl(num_clients=5, global_rounds=20, local_rounds=20)
     
     

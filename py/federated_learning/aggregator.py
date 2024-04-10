@@ -26,8 +26,9 @@ class FedAvg:
         N = len(self.local_params)
         round_agg = [p / N for p in round_agg]
         
-        for i, p in enumerate(self.params):
-            self.params[i] += self.lr * round_agg[i]
-        self.global_model.set_params(self.params)
+        # for i, p in enumerate(self.params):
+        #     self.params[i] += self.lr * round_agg[i]
+        # self.global_model.set_params(self.params)
+        self.global_model.set_params(round_agg)
         return self.global_model
         
