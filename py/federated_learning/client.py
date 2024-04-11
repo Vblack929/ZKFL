@@ -38,7 +38,7 @@ class Worker:
         self.y_test = y_test
         self.dataset = TensorDataset(torch.from_numpy(self.X_train).float(), torch.from_numpy(self.y_train).long())
         self.model = model
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
+        self.device = "cuda" if torch.cuda.is_available() else "mps"
         self.quantized = False
         self.dump_path = ''
         self.malicous = malicious
@@ -153,7 +153,7 @@ class Worker:
         pool.append(tx)
     
     def quantize_model(self):
-        if device == "mps":
+        if self.device == "mps":
             self.model.qconfig = torch.quantization.get_default_qconfig(
                 'qnnpack')
             torch.backends.quantized.engine = 'qnnpack'
@@ -162,7 +162,7 @@ class Worker:
             # Calibrate the model
             for i in (t := trange(10)):
                 samp = np.random.randint(
-                    0, len(self.dataset['train'].dataset), size=(64))
+                    0, len(self.X_train), size=(64))
                 X = torch.tensor(self.X_train[samp]).float()
                 Y = torch.tensor(self.y_train[samp]).long()
                 out = self.model(X)
@@ -170,27 +170,30 @@ class Worker:
             torch.quantization.convert(self.model, inplace=True)
             print("Quantization done")
 
-        elif device == "cuda":
+        elif self.device == "cuda":
+            self.model.to("cpu")
             self.model.qconfig = torch.quantization.get_default_qconfig(
                 'fbgemm')
             print(self.model.qconfig)
-            torch.quantization.prepare(self.model, inplace=True)
+            model_prepared = torch.quantization.prepare(self.model)
             # Calibrate the model
             for i in (t := trange(10)):
                 samp = np.random.randint(
-                    0, len(self.dataset['train'].dataset), size=(64))
+                    0, len(self.X_train), size=(64))
                 X = torch.tensor(self.X_train[samp]).float()
                 Y = torch.tensor(self.y_train[samp]).long()
-                out = self.model(X)
+                out = model_prepared(X)
             print("Calibration done")
-            torch.quantization.convert(self.model, inplace=True)
+            self.quantized_model = torch.quantization.convert(model_prepared)
             print("Quantization done")
-
+        
         self.quantized = True
 
 
-    def quantized_model_forward(self, x, dump_flag, dump_path='pretrained_model/LeNet_CIFAR_pretrained'):
-        quantized_lenet_forward(model=self.model, x=x, dump_flag=dump_flag, dump_path=dump_path) # dump the quantized model
+    def quantized_model_forward(self, x, y, dump_flag, dump_path='pretrained_model/LeNet_CIFAR_pretrained'):
+        if not self.quantized:
+            raise ValueError("Model is not quantized")
+        return quantized_lenet_forward(model=self.quantized_model, x=x, y=y, dump_flag=dump_flag, dump_path=dump_path) # dump the quantized model
     
 # class MIAttacker(Worker):
 #     """ 

@@ -40,7 +40,7 @@ class Network():
         self.X_test, self.y_test = X_test, y_test
         if model.lower() == 'lenet':
             self.global_model = LeNet_Small_Quant()
-        self.path = "../chains" + self.consensus + "/"
+        self.path = "chains" + self.consensus + "/"
 
     def init_network(self, clear_path=False):
         path = self.path
@@ -109,7 +109,7 @@ class POFLNetWork(Network):
             # evaluate and send tx
             for worker in self.workers:
                 _, acc = worker.evaluate(
-                    model=worker.model, x=X_test, y=y_test, B=64)
+                    model=worker.model, x=X_test, y=y_test, B=128)
                 update = worker.local_update(acc=acc)
                 worker.send_tx(update, self.blockchain.transaction_pool)
             print("Transactions sent")
@@ -122,7 +122,7 @@ class POFLNetWork(Network):
                 for worker in self.workers:
                     worker.set_params(params)
                     _, acc = worker.evaluate(
-                        model=worker.model, x=X_test, y=y_test, B=64)
+                        model=worker.model, x=X_test, y=y_test, B=128)
                     if acc == tx.accuracy:
                         print(
                             f"transaction from worker {tx.sender_id} verified by worker {worker.index}")
@@ -182,7 +182,7 @@ class POFLNetWork(Network):
     def local_train(self, B):
         for worker in self.workers:
             worker.model.set_optimizer(torch.optim.Adam(
-                worker.model.parameters(), lr=0.001))
+                worker.model.parameters(), lr=0.0001))
             worker.train_step_dp(
                 model=worker.model,
                 K=self.local_rounds,
@@ -199,12 +199,13 @@ class ZKFLChain(Network):
         super().__init__(num_clients, global_rounds,
                          local_rounds, frac_malicous, dataset, model)
         self.consesus = 'zkfl'
-        self.log = {}
+        self.init_network(clear_path=False)
 
     def run(self):
         self.workers = []
+        acc_dict = {}
         # public test set
-        X_test, y_test = self.X_test[:1000], self.y_test[:1000]
+        X_test, y_test = self.X_test[:100], self.y_test[:100]
         for i in range(self.num_clients):
             if i <= self.num_malicous:
                 worker = Worker(index=i+1,
@@ -225,6 +226,7 @@ class ZKFLChain(Network):
             self.workers.append(worker)
 
         for i in range(1, self.global_rounds+1):
+            acc_dict[i] = {}
             print(f"Global round {i}")
             # workers load global params from the last block
             global_params = self.blockchain.last_block.global_params
@@ -236,21 +238,28 @@ class ZKFLChain(Network):
             # quantize model
             for worker in self.workers:
                 worker.quantize_model()
-                dump_path = f'../pretrained_models/worker_{worker.index}/'
-                # clear the path if not empty
+                dump_path = f'pretrained_models/worker_{worker.index}/'
+                # # clear the path if not empty
                 if os.path.exists(dump_path):
-                    for file in os.listdir(dump_path):
-                        file_path = os.path.join(dump_path, file)
-                        os.remove(file_path)
+                    # for file in os.listdir(dump_path):
+                    #     file_path = os.path.join(dump_path, file)
+                    #     os.remove(file_path)
+                    pass
                 else:
                     os.makedirs(dump_path)
-                worker.quantized_model_forward(
-                    x=X_test, dump_flag=True, dump_path=dump_path)
+                    acc = worker.quantized_model_forward(
+                        x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
+                    acc_dict[i][worker.index] = acc
                 worker.dump_path = dump_path
 
             # eval and generate proof
             for worker in self.workers:
-                acc = zkfl.generate_proof(worker.dump_path)
+                acc = float(zkfl.generate_proof(worker.dump_path))
+                print(f"worker {worker.index} acc ", acc)
+                # if acc == acc_dict[i][worker.index]:
+                #     print(f"Worker {worker.index} proof verified")
+                # else:
+                #     print(f"Worker {worker.index} proof rejected")
                 update = worker.local_update(acc=acc)
                 worker.send_tx(update, self.blockchain.transaction_pool)
 
@@ -269,11 +278,11 @@ class ZKFLChain(Network):
             agg = federated_learning.FedAvg(
                 global_model=self.global_model, beta=0.9, lr=0.1)
             new_global_params = agg.aggregate(
-                local_params=[tx.params for tx in new_block.transactions]).get_params()
+                local_params=[tx.params for tx in new_block.transactions])
             # eval global model
             leader.model.set_params(new_global_params)
             _, gloabl_acc = leader.evaluate(
-                model=leader.model, x=X_test, y=y_test, B=64)
+                model=leader.model, x=X_test, y=y_test, B=128)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
             # append block to blockchain
@@ -324,7 +333,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
         local_params = []
         for w in workers:
             w.set_params(global_params)
-            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.005))
+            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.0001))
             w.train_step(
                 model=w.model,
                 K=local_rounds,
@@ -518,6 +527,12 @@ def centralized_dp(rounds: int):
 
 
 if __name__ == '__main__':
-    path = 'pretrained_model/LeNet_CIFAR_pretrained'
-    acc = zkfl.generate_proof(path) 
-    print(acc)
+    # network = POFLNetWork(num_clients=5,
+    #                       global_rounds=50,
+    #                       local_rounds=20,
+    #                       frac_malicous=0.0,
+    #                       dataset='cifar10',
+    #                       model='lenet')
+    # network.run()
+    network = ZKFLChain(num_clients=5, global_rounds=3, local_rounds=10, frac_malicous=0.0, dataset="cifar10", model="lenet")
+    network.run()

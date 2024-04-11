@@ -139,7 +139,7 @@ def quantized_lenet_forward(model, x, y, dump_flag, dump_path):
         
     # eval
     y_test_pred = np.argmax(linear2, axis=1)
-    np.savetxt(path + 'classification.txt', y_test_pred.flatten(), fmt='%u', delimiter=',')
+    np.savetxt(path + 'classification.txt', y.flatten(), fmt='%u', delimiter=',')
     eval_acc = np.mean(y_test_pred == y)
 
     return eval_acc

@@ -3,6 +3,8 @@
 /chains
 /data
 /py/federated_learning/data_utils.py
+/py/data
+/pretrained_models
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
