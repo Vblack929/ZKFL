@@ -174,10 +174,11 @@ class POFLNetWork(Network):
         np.savetxt(self.blockchain.save_path +
                    '/global_accuracy.txt', np.array(global_accuracy))
 
-        plt.plot(global_accuracy)
-        plt.xlabel("Global rounds")
-        plt.ylabel("Global accuracy")
-        plt.show()
+        # plt.plot(global_accuracy)
+        # plt.xlabel("Global rounds")
+        # plt.ylabel("Global accuracy")
+        # plt.show()
+        return global_accuracy
 
     def local_train(self, B):
         for worker in self.workers:
@@ -204,6 +205,7 @@ class ZKFLChain(Network):
     def run(self):
         self.workers = []
         acc_dict = {}
+        global_accuracy = []
         # public test set
         X_test, y_test = self.X_test[:100], self.y_test[:100]
         for i in range(self.num_clients):
@@ -285,6 +287,7 @@ class ZKFLChain(Network):
                 model=leader.model, x=X_test, y=y_test, B=128)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
+            global_accuracy.append(gloabl_acc)
             # append block to blockchain
             self.blockchain.add_block(new_block)
             if not self.blockchain.valid_chain:
@@ -292,11 +295,13 @@ class ZKFLChain(Network):
                 break
             self.blockchain.store_block(new_block)
             self.blockchain.empty_transaction_pool()
+        
+        return global_accuracy
 
     def local_train(self, B):
         for worker in self.workers:
             worker.set_optimizer(torch.optim.Adam(
-                worker.model.parameters(), lr=0.001))
+                worker.model.parameters(), lr=0.0001))
             worker.train_step(
                 model=worker.model,
                 K=self.local_rounds,
@@ -337,7 +342,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=128
+                B=64
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
@@ -349,14 +354,15 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
         global_accuracy.append(acc)
 
     # plot the global accuracy
-    plt.plot(global_accuracy)
-    plt.xlabel("Global rounds")
-    plt.ylabel("Global accuracy")
-    plt.show()
+    # plt.plot(global_accuracy)
+    # plt.xlabel("Global rounds")
+    # plt.ylabel("Global accuracy")
+    # plt.show()
+    return global_accuracy
 
 
 def centralized_training(rounds):
-    data_dir = '../data/CIFAR10_data/'
+    data_dir = 'data/CIFAR10_data/'
     apply_transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Pad(4),
@@ -369,12 +375,12 @@ def centralized_training(rounds):
     test_dataset = datasets.CIFAR10(data_dir, train=False, download=True,
                                     transform=apply_transform)
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=128, shuffle=True)
+        train_dataset, batch_size=64, shuffle=True)
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=128, shuffle=False)
+        test_dataset, batch_size=64, shuffle=False)
 
     model = LeNet_Small_Quant()
-    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.001))
+    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.0001))
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
     model.to(device)
     print("training on ", device)
@@ -415,34 +421,35 @@ def centralized_training(rounds):
         if k % 10 == 0:
             print(f"test epoch {k}: loss {loss}, acc {acc}")
     # plot the training loss and accuracy in the same figure
-    fig, ax1 = plt.subplots()
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss', color='tab:red')
-    ax1.plot(train_loss, color='tab:red')
-    ax1.tick_params(axis='y', labelcolor='tab:red')
+    # fig, ax1 = plt.subplots()
+    # ax1.set_xlabel('Epoch')
+    # ax1.set_ylabel('Loss', color='tab:red')
+    # ax1.plot(train_loss, color='tab:red')
+    # ax1.tick_params(axis='y', labelcolor='tab:red')
 
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Accuracy', color='tab:blue')
-    ax2.plot(train_acc, color='tab:blue')
-    ax2.tick_params(axis='y', labelcolor='tab:blue')
+    # ax2 = ax1.twinx()
+    # ax2.set_ylabel('Accuracy', color='tab:blue')
+    # ax2.plot(train_acc, color='tab:blue')
+    # ax2.tick_params(axis='y', labelcolor='tab:blue')
 
-    fig.tight_layout()
-    plt.show()
+    # fig.tight_layout()
+    # plt.show()
 
-    # plot the test loss and accuracy in the same figure
-    fig, ax1 = plt.subplots()
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss', color='tab:red')
-    ax1.plot(test_loss, color='tab:red')
-    ax1.tick_params(axis='y', labelcolor='tab:red')
+    # # plot the test loss and accuracy in the same figure
+    # fig, ax1 = plt.subplots()
+    # ax1.set_xlabel('Epoch')
+    # ax1.set_ylabel('Loss', color='tab:red')
+    # ax1.plot(test_loss, color='tab:red')
+    # ax1.tick_params(axis='y', labelcolor='tab:red')
 
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Accuracy', color='tab:blue')
-    ax2.plot(test_acc, color='tab:blue')
-    ax2.tick_params(axis='y', labelcolor='tab:blue')
+    # ax2 = ax1.twinx()
+    # ax2.set_ylabel('Accuracy', color='tab:blue')
+    # ax2.plot(test_acc, color='tab:blue')
+    # ax2.tick_params(axis='y', labelcolor='tab:blue')
 
-    fig.tight_layout()
-    plt.show()
+    # fig.tight_layout()
+    # plt.show()
+    return test_acc
 
 
 def centralized_dp(rounds: int):
@@ -507,16 +514,16 @@ def centralized_dp(rounds: int):
                 x, y = x.to(device), y.to(device)
                 output = model(x)
                 loss += loss_fn(output, y)
-                
+
                 preds = np.argmax(output.detach().cpu().numpy(), axis=1)
                 labels = y.detach().cpu().numpy()
                 acc += np.sum(preds == labels)
-                
+
         loss /= len(test_loader)
         acc /= len(test_loader)
         test_loss.append(loss.item())
         test_acc.append(acc)
-        
+
         print(f"test epoch {k}: loss {loss}, acc {acc}")
 
     # plot the test accuracy
@@ -525,14 +532,35 @@ def centralized_dp(rounds: int):
     plt.ylabel("Accuracy")
     plt.show()
 
+def test(rounds: int):
+    net1 = POFLNetWork(num_clients=5,
+                          global_rounds=rounds,
+                          local_rounds=20,
+                          frac_malicous=0.0,
+                          dataset='cifar10',
+                          model='lenet')
+    pofl_acc = net1.run()
+    net2 = ZKFLChain(num_clients=5,
+                        global_rounds=rounds,
+                        local_rounds=20, 
+                        frac_malicous=0.0, 
+                        dataset="cifar10", 
+                        model="lenet")
+    zkfl_acc = net2.run()
+    print(zkfl_acc)
+    fl_acc = vanillia_fl(num_clients=5, global_rounds=rounds, local_rounds=20)
+    cl_acc = centralized_training(rounds)
+    
+    # plot all accuracy on one figure
+    plt.plot(pofl_acc, label='POFL')
+    plt.plot(zkfl_acc, label='ZKFL')
+    plt.plot(fl_acc, label='FL')
+    plt.plot(cl_acc, label='CL')
+    plt.xlabel("Global rounds")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.show()
+    
 
 if __name__ == '__main__':
-    # network = POFLNetWork(num_clients=5,
-    #                       global_rounds=50,
-    #                       local_rounds=20,
-    #                       frac_malicous=0.0,
-    #                       dataset='cifar10',
-    #                       model='lenet')
-    # network.run()
-    network = ZKFLChain(num_clients=5, global_rounds=3, local_rounds=10, frac_malicous=0.0, dataset="cifar10", model="lenet")
-    network.run()
+    test(1)
