@@ -226,6 +226,7 @@ def load_cifar10(num_users, n_class, n_samples, rate_unbalance):
 
     return (train_xs, train_ys), (np.array(test_imgs), np.array(test_labels))
 
+
 # def load_cifar10(num_users, n_class, n_samples, even_split=True):
 #     """ 
 #     Returns (X_train, y_train), (X_test, y_test) where X_train and y_train are lists of length num_users

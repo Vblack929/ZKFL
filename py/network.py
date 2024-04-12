@@ -152,7 +152,7 @@ class POFLNetWork(Network):
             # aggregate
             print("Start aggregation")
             agg = federated_learning.FedAvg(
-                global_model=self.global_model, beta=0.9, lr=0.1)
+                global_model=self.global_model)
             new_global_params = agg.aggregate(
                 local_params=[tx.params for tx in new_block.transactions])
             # eval global model
@@ -243,10 +243,10 @@ class ZKFLChain(Network):
                 dump_path = f'pretrained_models/worker_{worker.index}/'
                 # # clear the path if not empty
                 if os.path.exists(dump_path):
-                    # for file in os.listdir(dump_path):
-                    #     file_path = os.path.join(dump_path, file)
-                    #     os.remove(file_path)
-                    pass
+                    for file in os.listdir(dump_path):
+                        file_path = os.path.join(dump_path, file)
+                        os.remove(file_path)
+                    # pass
                 else:
                     os.makedirs(dump_path)
                     acc = worker.quantized_model_forward(
@@ -278,7 +278,7 @@ class ZKFLChain(Network):
                                          )
             new_block.miner_id = leader_id
             agg = federated_learning.FedAvg(
-                global_model=self.global_model, beta=0.9, lr=0.1)
+                global_model=self.global_model)
             new_global_params = agg.aggregate(
                 local_params=[tx.params for tx in new_block.transactions])
             # eval global model
@@ -346,7 +346,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
-            global_model=global_model, beta=0.9, lr=0.1)
+            global_model=global_model)
         new_global_params = agg.aggregate(local_params=local_params)
         global_model.set_params(new_global_params)
         _, acc = global_model.eval_step(x=X_test, y=y_test, B=64)

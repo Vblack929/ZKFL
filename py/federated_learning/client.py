@@ -136,11 +136,13 @@ class Worker:
         """
         update = {}
         update['worker id'] = self.index
+        if self.malicous:
+            # malicious worker will claim a accuracy higher than the actual accuracy but lower than 1
+            acc = np.random.uniform(acc, 1)
         update['accuracy'] = acc
         update['params'] = self.get_params()
         return update
-
-    
+            
     def send_tx(self, local_update: dict, pool: List[Transaction]):
         tx = Transaction(
             sender_id = local_update['worker id'],
@@ -151,6 +153,9 @@ class Worker:
             verified=False
         )
         pool.append(tx)
+
+    
+            
     
     def quantize_model(self):
         if self.device == "mps":
