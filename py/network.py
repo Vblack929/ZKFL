@@ -342,7 +342,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=64
+                B=128
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
@@ -380,7 +380,7 @@ def centralized_training(rounds):
         test_dataset, batch_size=64, shuffle=False)
 
     model = LeNet_Small_Quant()
-    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.0001))
+    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.001))
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
     model.to(device)
     print("training on ", device)
@@ -563,4 +563,10 @@ def test(rounds: int):
     
 
 if __name__ == '__main__':
-    test(1)
+    # acc = centralized_training(30)
+    acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
+    plt.plot(acc)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.show()
+    
