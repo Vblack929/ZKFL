@@ -151,7 +151,7 @@ pub fn read_lenet_model(
     Vec<f32>,) {
     let x: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(
         format!("{}/X_q.txt", path),
-        100,
+        10,
         3,
         32,
         32,

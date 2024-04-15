@@ -207,7 +207,7 @@ class ZKFLChain(Network):
         acc_dict = {}
         global_accuracy = []
         # public test set
-        X_test, y_test = self.X_test[:100], self.y_test[:100]
+        X_test, y_test = self.X_test[:10], self.y_test[:10]
         for i in range(self.num_clients):
             if i <= self.num_malicous:
                 worker = Worker(index=i+1,
@@ -249,20 +249,22 @@ class ZKFLChain(Network):
                     # pass
                 else:
                     os.makedirs(dump_path)
-                    acc = worker.quantized_model_forward(
-                        x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
-                    acc_dict[i][worker.index] = acc
+                acc = worker.quantized_model_forward(
+                    x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
+                    # acc_dict[i][worker.index] = acc
                 worker.dump_path = dump_path
 
             # eval and generate proof
             for worker in self.workers:
                 acc = float(zkfl.generate_proof(worker.dump_path))
+                claimed_acc = worker.local_update(acc=acc)["accuracy"]
                 print(f"worker {worker.index} acc ", acc)
-                # if acc == acc_dict[i][worker.index]:
-                #     print(f"Worker {worker.index} proof verified")
-                # else:
-                #     print(f"Worker {worker.index} proof rejected")
-                update = worker.local_update(acc=acc)
+                print(f"worker {worker.index} claimed acc ", claimed_acc)
+                if acc == claimed_acc:
+                    print(f"Worker {worker.index} proof verified")
+                else:
+                    print(f"Worker {worker.index} proof rejected")
+                update = worker.local_update(acc=claimed_acc)
                 worker.send_tx(update, self.blockchain.transaction_pool)
 
             self.blockchain.sort_transactions()
@@ -277,16 +279,22 @@ class ZKFLChain(Network):
                                          global_params=None,
                                          )
             new_block.miner_id = leader_id
-            agg = federated_learning.FedAvg(
-                global_model=self.global_model)
+            if not leader.malicous: # leader is honest and will perform fedavg aggregation
+                agg = federated_learning.FedAvg(
+                    global_model=self.global_model)
+            else: # leader is malicious and will perform guassian attack
+                agg = federated_learning.GuassianAttack(
+                    global_model=self.global_model
+                )
+                
             new_global_params = agg.aggregate(
                 local_params=[tx.params for tx in new_block.transactions])
-            # eval global model
             leader.model.set_params(new_global_params)
             _, gloabl_acc = leader.evaluate(
                 model=leader.model, x=X_test, y=y_test, B=128)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
+                
             global_accuracy.append(gloabl_acc)
             # append block to blockchain
             self.blockchain.add_block(new_block)
@@ -564,7 +572,14 @@ def test(rounds: int):
 
 if __name__ == '__main__':
     # acc = centralized_training(30)
-    acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
+    # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
+    net = ZKFLChain(num_clients=1,
+                    global_rounds=1,
+                    local_rounds=5,
+                    frac_malicous=0.0,
+                    dataset='cifar10',
+                    model='lenet')
+    acc = net.run()
     plt.plot(acc)
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
