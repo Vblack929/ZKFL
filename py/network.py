@@ -1,4 +1,3 @@
-from copy import deepcopy
 import warnings
 import time
 import os
@@ -16,8 +15,6 @@ from federated_learning.client import Worker
 from federated_learning.model import LeNet_Small_Quant
 
 warnings.filterwarnings("ignore")
-
-EPS = 0.05
 
 
 class Network(blockchain.Blockchain):
