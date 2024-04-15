@@ -36,7 +36,7 @@ class Worker:
         self.y_train = y_train
         self.X_test = X_test
         self.y_test = y_test
-        self.dataset = TensorDataset(torch.from_numpy(self.X_train).float(), torch.from_numpy(self.y_train).long())
+        self.dataset = None
         self.model = model
         self.device = "cuda" if torch.cuda.is_available() else "mps"
         self.quantized = False
@@ -71,6 +71,11 @@ class Worker:
             K: Number of local epochs.
             B: Batch size.
         """
+        if self.dataset is None:
+            dataset = TensorDataset(torch.from_numpy(self.X_train).float(), torch.from_numpy(self.y_train).long())
+            self.dataset = dataset  # save the dataset
+        else:
+            dataset = self.dataset
         train_loader = DataLoader(self.dataset, batch_size=B, shuffle=True)
         model.to(self.device)
         model.train()
@@ -82,7 +87,12 @@ class Worker:
                 print(f"Worker {self.index} local epoch {k}: loss {loss}")
                 
     def train_step_dp(self, model, K, B, norm, eps, delta):
-        train_loader = DataLoader(self.dataset, batch_size=B, shuffle=True)
+        if self.dataset is None:
+            dataset = TensorDataset(torch.from_numpy(self.X_train).float(), torch.from_numpy(self.y_train).long())
+            self.dataset = dataset  # save the dataset
+        else:
+            dataset = self.dataset
+        train_loader = DataLoader(dataset, batch_size=B, shuffle=True)
         model.to(self.device)   
         model.train()
         # create privacy engine

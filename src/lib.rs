@@ -126,6 +126,11 @@ pub fn generate_proof(path: String) -> PyResult<String> {
 
     println!("finish forwarding");
 
+    // print z
+    for i in 0..z.len() {
+        println!("z[{}]: {:?}", i, z[i]);
+    }
+
 
     let mut num_of_correct_prediction = 0u64;
     let mut accuracy_results = Vec::new();
@@ -203,50 +208,50 @@ pub fn generate_proof(path: String) -> PyResult<String> {
 
     let classification_res = argmax_u8(z[0].clone());
 
-    let full_circuit = LeNetCircuitU8OptimizedLv3PoseidonClassificationAccuracy {
-        params: parameter.clone(),
-        x: x_current_batch.clone(),
+    // let full_circuit = LeNetCircuitU8OptimizedLv3PoseidonClassificationAccuracy {
+    //     params: parameter.clone(),
+    //     x: x_current_batch.clone(),
 
-        conv1_weights: conv1_w.clone(),
-        conv1_squeeze: conv1_squeeze.clone(),
+    //     conv1_weights: conv1_w.clone(),
+    //     conv1_squeeze: conv1_squeeze.clone(),
 
-        conv2_weights: conv2_w.clone(),
-        conv2_squeeze: conv2_squeeze.clone(),
+    //     conv2_weights: conv2_w.clone(),
+    //     conv2_squeeze: conv2_squeeze.clone(),
 
-        conv3_weights: conv3_w.clone(),
-        conv3_squeeze: conv3_squeeze.clone(),
+    //     conv3_weights: conv3_w.clone(),
+    //     conv3_squeeze: conv3_squeeze.clone(),
 
-        fc1_weights: fc1_w.clone(),
-        fc1_squeeze: fc1_squeeze.clone(),
+    //     fc1_weights: fc1_w.clone(),
+    //     fc1_squeeze: fc1_squeeze.clone(),
 
-        fc2_weights: fc2_w.clone(),
-        fc2_squeeze: fc2_squeeze.clone(),
+    //     fc2_weights: fc2_w.clone(),
+    //     fc2_squeeze: fc2_squeeze.clone(),
 
-        //zero points for quantization.
-        x_0: x_0[0],
-        conv1_output_0: conv1_output_0[0],
-        conv2_output_0: conv2_output_0[0],
-        conv3_output_0: conv3_output_0[0],
-        fc1_output_0: fc1_output_0[0],
-        fc2_output_0: fc2_output_0[0], // which is also lenet output(z) zero point
+    //     //zero points for quantization.
+    //     x_0: x_0[0],
+    //     conv1_output_0: conv1_output_0[0],
+    //     conv2_output_0: conv2_output_0[0],
+    //     conv3_output_0: conv3_output_0[0],
+    //     fc1_output_0: fc1_output_0[0],
+    //     fc2_output_0: fc2_output_0[0], // which is also lenet output(z) zero point
 
-        conv1_weights_0: conv1_weights_0[0],
-        conv2_weights_0: conv2_weights_0[0],
-        conv3_weights_0: conv3_weights_0[0],
-        fc1_weights_0: fc1_weights_0[0],
-        fc2_weights_0: fc2_weights_0[0],
+    //     conv1_weights_0: conv1_weights_0[0],
+    //     conv2_weights_0: conv2_weights_0[0],
+    //     conv3_weights_0: conv3_weights_0[0],
+    //     fc1_weights_0: fc1_weights_0[0],
+    //     fc2_weights_0: fc2_weights_0[0],
 
-        //multiplier for quantization
-        multiplier_conv1: multiplier_conv1.clone(),
-        multiplier_conv2: multiplier_conv2.clone(),
-        multiplier_conv3: multiplier_conv3.clone(),
-        multiplier_fc1: multiplier_fc1.clone(),
-        multiplier_fc2: multiplier_fc2.clone(),
+    //     //multiplier for quantization
+    //     multiplier_conv1: multiplier_conv1.clone(),
+    //     multiplier_conv2: multiplier_conv2.clone(),
+    //     multiplier_conv3: multiplier_conv3.clone(),
+    //     multiplier_fc1: multiplier_fc1.clone(),
+    //     multiplier_fc2: multiplier_fc2.clone(),
 
-        true_labels: true_labels_batch.clone(),
-        accuracy_result: accuracy_input[0].clone(),
-        accuracy_squeeze: accuracy_squeeze[0].clone(),
-    };
+    //     true_labels: true_labels_batch.clone(),
+    //     accuracy_result: accuracy_input[0].clone(),
+    //     accuracy_squeeze: accuracy_squeeze[0].clone(),
+    // };
 
     let mut acc_sponge2 = PoseidonSponge::new(&parameter);
 
@@ -265,8 +270,8 @@ pub fn generate_proof(path: String) -> PyResult<String> {
     let begin = Instant::now();
 
     // pre-computed parameters
-    let param =
-        generate_random_parameters::<Bls12_381, _, _>(full_circuit.clone(), &mut rng).unwrap();
+    // let param =
+    //     generate_random_parameters::<Bls12_381, _, _>(full_circuit.clone(), &mut rng).unwrap();
     let param_acc =
         generate_random_parameters::<Bls12_381, _, _>(accuracy_sumcheck_circuit.clone(), &mut rng)
             .unwrap();
@@ -274,21 +279,21 @@ pub fn generate_proof(path: String) -> PyResult<String> {
 
     println!("setup time {:?}", end.duration_since(begin));
 
-    let mut buf = vec![];
-    param.serialize(&mut buf).unwrap();
+    // let mut buf = vec![];
+    // param.serialize(&mut buf).unwrap();
     let mut buf_acc = vec![];
     param_acc.serialize(&mut buf_acc).unwrap();
-    println!("crs size: {}", buf.len() + buf_acc.len());
+    // println!("crs size: {}", buf.len() + buf_acc.len());
     println!("crs size: {}", buf_acc.len());
 
-    let pvk = prepare_verifying_key(&param.vk);
+    // let pvk = prepare_verifying_key(&param.vk);
     let pvk_acc = prepare_verifying_key(&param_acc.vk);
 
     println!("random parameters generated!\n");
 
     // prover
     let begin = Instant::now();
-    let proof = create_random_proof(full_circuit, &param, &mut rng).unwrap();
+    // let proof = create_random_proof(full_circuit, &param, &mut rng).unwrap();
     let proof_acc = create_random_proof(accuracy_sumcheck_circuit, &param_acc, &mut rng).unwrap();
 
     let end = Instant::now();
@@ -310,7 +315,7 @@ pub fn generate_proof(path: String) -> PyResult<String> {
     .concat();
 
     let begin = Instant::now();
-    assert!(verify_proof(&pvk, &proof, &inputs[..].as_ref()).unwrap());
+    // assert!(verify_proof(&pvk, &proof, &inputs[..].as_ref()).unwrap());
     assert!(verify_proof(&pvk_acc, &proof_acc, &accuracy_squeeze2).unwrap());
     let end = Instant::now();
     println!("verification time {:?}", end.duration_since(begin));

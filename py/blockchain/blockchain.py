@@ -54,7 +54,7 @@ class Block:
 
 
 class Blockchain:
-    def __init__(self, consensus, max_nodes, model, task, save_path):
+    def __init__(self, consensus, max_nodes, model, task, path):
         """ 
         Constructor for the `Blockchain` class. 
         """
@@ -63,7 +63,7 @@ class Blockchain:
         self.max_nodes = max_nodes
         self.model = model
         self.task = task
-        self.save_path = save_path
+        self.path = path
         self.peers = set()
         self.transaction_pool = []
         self.genesis_block = self.create_genesis_block()
@@ -123,7 +123,7 @@ class Blockchain:
         :param block: Block to be stored in the chain.
         """
         file_name = "block" + str(block.index) + ".txt"
-        file_path = os.path.join(self.save_path, file_name)
+        file_path = os.path.join(self.path, file_name)
 
         with open(file_path, "w") as f:
             f.write(json.dumps(block.__str__(), indent=4))

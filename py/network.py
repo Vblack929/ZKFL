@@ -20,86 +20,92 @@ warnings.filterwarnings("ignore")
 EPS = 0.05
 
 
-class Network():
-    def __init__(self, num_clients: int, global_rounds: int, local_rounds: int, frac_malicous: float,
-                 dataset: str, model: str):
-        self.consensus = ''
+class Network(blockchain.Blockchain):
+    def __init__(self,
+                 consensus: str,
+                 num_clients: int, 
+                 global_rounds: int, 
+                 local_rounds: int, 
+                 frac_malicous: float,
+                 dataset: str, 
+                 model: str):
+        path = "chains"
+        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        path = os.path.join(path, t)
+        os.makedirs(path)
+
+        if model.lower() == 'lenet':
+            self.model = LeNet_Small_Quant()
+        super().__init__(consensus=consensus, max_nodes=100, model=self.model, task=dataset, path=path)
         self.num_clients = num_clients
         self.global_rounds = global_rounds
-        self.local_rounds = local_rounds
+        self.local_rounds = local_rounds    
         self.frac_malicous = frac_malicous
         self.num_malicous = int(self.num_clients * self.frac_malicous)
         self.dataset = dataset
+        n_class = 10
+        n_samples = int(50000 / (self.num_clients * n_class))
         if self.dataset.lower() == 'cifar10':
             (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=self.num_clients,
-                                                                                   n_class=10,
-                                                                                   n_samples=1000,
+                                                                                   n_class=n_class,
+                                                                                   n_samples=n_samples,
                                                                                    rate_unbalance=1.0,
                                                                                    )
         self.X_train, self.y_train = X_train, y_train
         self.X_test, self.y_test = X_test, y_test
-        if model.lower() == 'lenet':
-            self.global_model = LeNet_Small_Quant()
-        self.path = "chains" + self.consensus + "/"
-
-    def init_network(self, clear_path=False):
-        path = self.path
-        if clear_path:
-            for subfolder in os.listdir(path):
-                subfolder_path = os.path.join(path, subfolder)
-            if os.path.isdir(subfolder_path):
-                for file in os.listdir(subfolder_path):
-                    file_path = os.path.join(subfolder_path, file)
-                    os.remove(file_path)
-                os.rmdir(subfolder_path)
-
-        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        path = os.path.join(path, t)
-
-        os.makedirs(path)
-
-        # initialize the blockchain
-        self.blockchain = blockchain.Blockchain(consensus=self.consensus, max_nodes=self.num_clients, model=self.global_model,
-                                                task='cifar10', save_path=path)
-
-
+        
+        for i in range(1, self.max_nodes+1):
+            if i <= self.num_malicous:
+                node = Worker(index=i, X_train=None, y_train=None, X_test=None, y_test=None, model=LeNet_Small_Quant(), malicious=True)
+            else:
+                node = Worker(index=i, X_train=None, y_train=None, X_test=None, y_test=None, model=LeNet_Small_Quant(), malicious=False)
+            self.peers.add(node)
+        
+    def init_network(self):
+        """ 
+        Choose clients for the current round of training
+        """
+        # randomly select clients from peers, if leader exists from last round, then select the leader
+        if self.last_block.miner_id > 0:
+            leader = [peer for peer in self.peers if peer.index == self.last_block.miner_id][0]
+            self.workers = [leader]
+            # randomly select other clients
+            for i in range(self.num_clients-1):
+                client = np.random.choice(list(self.peers - set(self.workers)))
+                self.workers.append(client)
+        else:
+            self.workers = np.random.choice(list(self.peers), self.num_clients, replace=False)
+        # assign data to clients
+        global_params = self.model.get_params()
+        for i, worker in enumerate(self.workers):
+            worker.X_train = self.X_train[i]
+            worker.y_train = self.y_train[i]
+            worker.set_params(global_params)    
+            
+        
+            
 class POFLNetWork(Network):
     def __init__(self, num_clients: int, global_rounds: int, local_rounds: int, frac_malicous: float,
                  dataset: str, model: str):
-        super().__init__(num_clients, global_rounds,
-                         local_rounds, frac_malicous, dataset, model)
-        self.consesus = 'pofl'
-        self.init_network(clear_path=False)
+        super().__init__(consensus='pofl',
+                         num_clients=num_clients,
+                         global_rounds=global_rounds,
+                         local_rounds=local_rounds,
+                         frac_malicous=frac_malicous,
+                         dataset=dataset,
+                         model=model)
 
     def run(self):
         # init workers
-        self.workers = []
         global_accuracy = []
         # public test set
         X_test, y_test = self.X_test[:1000], self.y_test[:1000]
-        for i in range(self.num_clients):
-            if i <= self.num_malicous:
-                worker = Worker(index=i+1,
-                                X_train=self.X_train[i],
-                                y_train=self.y_train[i],
-                                X_test=None,
-                                y_test=None,
-                                model=LeNet_Small_Quant(),
-                                malicious=True)
-            else:
-                worker = Worker(index=i+1,
-                                X_train=self.X_train[i],
-                                y_train=self.y_train[i],
-                                X_test=None,
-                                y_test=None,
-                                model=LeNet_Small_Quant(),
-                                malicious=False)
-            self.workers.append(worker)
 
         for i in range(1, self.global_rounds+1):
+            self.init_network()
             print(f"Global round {i}")
             # workers load global params from the last block
-            global_params = self.blockchain.last_block.global_params
+            global_params = self.last_block.global_params
             for w in self.workers:
                 w.model = LeNet_Small_Quant()
                 w.set_params(global_params)
@@ -111,12 +117,12 @@ class POFLNetWork(Network):
                 _, acc = worker.evaluate(
                     model=worker.model, x=X_test, y=y_test, B=128)
                 update = worker.local_update(acc=acc)
-                worker.send_tx(update, self.blockchain.transaction_pool)
+                worker.send_tx(update, self.transaction_pool)
             print("Transactions sent")
             # eval update
             print("Start eval update")
-            self.blockchain.sort_transactions()
-            for tx in self.blockchain.transaction_pool:
+            self.sort_transactions()
+            for tx in self.transaction_pool:
                 vote = 0
                 params = tx.params
                 for worker in self.workers:
@@ -142,17 +148,17 @@ class POFLNetWork(Network):
             leader = [
                 worker for worker in self.workers if worker.index == leader_id][0]
             # leader perform aggregation
-            new_block = blockchain.Block(index=len(self.blockchain),
-                                         transactions=self.blockchain.transaction_pool,
+            new_block = blockchain.Block(index=len(self),
+                                         transactions=self.transaction_pool,
                                          timestamp=time.time(),
-                                         previous_hash=self.blockchain.last_block.hash,
+                                         previous_hash=self.last_block.hash,
                                          global_params=None,
                                          )
             new_block.miner_id = leader_id
             # aggregate
             print("Start aggregation")
             agg = federated_learning.FedAvg(
-                global_model=self.global_model)
+                global_model=self.model)
             new_global_params = agg.aggregate(
                 local_params=[tx.params for tx in new_block.transactions])
             # eval global model
@@ -163,15 +169,15 @@ class POFLNetWork(Network):
             new_block.global_accuracy = gloabl_acc
             global_accuracy.append(gloabl_acc)
             # append block to blockchain
-            self.blockchain.add_block(new_block)
-            if not self.blockchain.valid_chain:
+            self.add_block(new_block)
+            if not self.valid_chain:
                 print("Chain invalid")
                 break
-            self.blockchain.store_block(new_block)
-            self.blockchain.empty_transaction_pool()
+            self.store_block(new_block)
+            self.empty_transaction_pool()
 
         # save the global accuracy as txt
-        np.savetxt(self.blockchain.save_path +
+        np.savetxt(self.path +
                    '/global_accuracy.txt', np.array(global_accuracy))
 
         # plt.plot(global_accuracy)
@@ -197,43 +203,25 @@ class POFLNetWork(Network):
 class ZKFLChain(Network):
     def __init__(self, num_clients: int, global_rounds: int, local_rounds: int, frac_malicous: float,
                  dataset: str, model: str):
-        super().__init__(num_clients, global_rounds,
-                         local_rounds, frac_malicous, dataset, model)
-        self.consesus = 'zkfl'
-        self.init_network(clear_path=False)
+        super().__init__(consensus='zkfl',
+                         num_clients=num_clients,
+                         global_rounds=global_rounds,
+                         local_rounds=local_rounds,
+                         frac_malicous=frac_malicous,
+                         dataset=dataset,
+                         model=model)
 
     def run(self):
-        self.workers = []
         acc_dict = {}
         global_accuracy = []
         # public test set
         X_test, y_test = self.X_test[:10], self.y_test[:10]
-        for i in range(self.num_clients):
-            if i <= self.num_malicous:
-                worker = Worker(index=i+1,
-                                X_train=self.X_train[i],
-                                y_train=self.y_train[i],
-                                X_test=None,
-                                y_test=None,
-                                model=LeNet_Small_Quant(),
-                                malicious=True)
-            else:
-                worker = Worker(index=i+1,
-                                X_train=self.X_train[i],
-                                y_train=self.y_train[i],
-                                X_test=None,
-                                y_test=None,
-                                model=LeNet_Small_Quant(),
-                                malicious=False)
-            self.workers.append(worker)
 
         for i in range(1, self.global_rounds+1):
+            self.init_network()
             acc_dict[i] = {}
             print(f"Global round {i}")
             # workers load global params from the last block
-            global_params = self.blockchain.last_block.global_params
-            for w in self.workers:
-                w.set_params(global_params)
             # local training
             self.local_train(B=64)
             print("Local training done")
@@ -265,26 +253,26 @@ class ZKFLChain(Network):
                 else:
                     print(f"Worker {worker.index} proof rejected")
                 update = worker.local_update(acc=claimed_acc)
-                worker.send_tx(update, self.blockchain.transaction_pool)
+                worker.send_tx(update, self.transaction_pool)
 
-            self.blockchain.sort_transactions()
-            leader_id = self.blockchain.transaction_pool[0].sender_id
+            self.sort_transactions()
+            leader_id = self.transaction_pool[0].sender_id
             leader = [
                 worker for worker in self.workers if worker.index == leader_id][0]
             # leader perform aggregation
-            new_block = blockchain.Block(index=len(self.blockchain),
-                                         transactions=self.blockchain.transaction_pool,
+            new_block = blockchain.Block(index=len(self),
+                                         transactions=self.transaction_pool,
                                          timestamp=time.time(),
-                                         previous_hash=self.blockchain.last_block.hash,
+                                         previous_hash=self.last_block.hash,
                                          global_params=None,
                                          )
             new_block.miner_id = leader_id
             if not leader.malicous: # leader is honest and will perform fedavg aggregation
                 agg = federated_learning.FedAvg(
-                    global_model=self.global_model)
+                    global_model=self.model)
             else: # leader is malicious and will perform guassian attack
                 agg = federated_learning.GuassianAttack(
-                    global_model=self.global_model
+                    global_model=self.model
                 )
                 
             new_global_params = agg.aggregate(
@@ -297,12 +285,12 @@ class ZKFLChain(Network):
                 
             global_accuracy.append(gloabl_acc)
             # append block to blockchain
-            self.blockchain.add_block(new_block)
-            if not self.blockchain.valid_chain:
+            self.add_block(new_block)
+            if not self.valid_chain:
                 print("Chain invalid")
                 break
-            self.blockchain.store_block(new_block)
-            self.blockchain.empty_transaction_pool()
+            self.store_block(new_block)
+            self.empty_transaction_pool()
         
         return global_accuracy
 
@@ -573,15 +561,19 @@ def test(rounds: int):
 if __name__ == '__main__':
     # acc = centralized_training(30)
     # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
-    net = ZKFLChain(num_clients=1,
-                    global_rounds=1,
-                    local_rounds=5,
-                    frac_malicous=0.0,
-                    dataset='cifar10',
-                    model='lenet')
-    acc = net.run()
-    plt.plot(acc)
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.show()
+    # net = ZKFLChain(num_clients=1,
+    #                 global_rounds=1,
+    #                 local_rounds=5,
+    #                 frac_malicous=0.0,
+    #                 dataset='cifar10',
+    #                 model='lenet')
+    # acc = net.run()
+    # plt.plot(acc)
+    # plt.xlabel("Epoch")
+    # plt.ylabel("Accuracy")
+    # plt.show()
+    # net = POFLNetWork(num_clients=5, global_rounds=1, local_rounds=5, frac_malicous=0.3, dataset='cifar10', model='lenet')
+    # net.run()
+    path = 'pretrained_model/LeNet_CIFAR_pretrained'
+    zkfl.generate_proof(path)
     
