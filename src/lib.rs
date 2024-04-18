@@ -302,17 +302,17 @@ pub fn generate_proof(path: String) -> PyResult<String> {
     let x_inputs: Vec<Fq> = convert_4d_vector_into_fq(x_current_batch.clone());
     let true_label_inputs: Vec<Fq> = convert_1d_vector_into_fq(true_labels_batch.clone());
 
-    let inputs = [
-        conv1_squeeze,
-        conv2_squeeze,
-        conv3_squeeze,
-        fc1_squeeze,
-        fc2_squeeze,
-        accuracy_squeeze[0].clone(),
-        x_inputs,
-        true_label_inputs,
-    ]
-    .concat();
+    // let inputs = [
+    //     conv1_squeeze,
+    //     conv2_squeeze,
+    //     conv3_squeeze,
+    //     fc1_squeeze,
+    //     fc2_squeeze,
+    //     accuracy_squeeze[0].clone(),
+    //     x_inputs,
+    //     true_label_inputs,
+    // ]
+    // .concat();
 
     let begin = Instant::now();
     // assert!(verify_proof(&pvk, &proof, &inputs[..].as_ref()).unwrap());
