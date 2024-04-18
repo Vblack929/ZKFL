@@ -107,7 +107,7 @@ class POFLNetWork(Network):
                 w.model = LeNet_Small_Quant()
                 w.set_params(global_params)
             # local training
-            self.local_train(B=128)
+            self.local_train(B=64)
             print("Local training done")
             # evaluate and send tx
             for worker in self.workers:
@@ -161,9 +161,10 @@ class POFLNetWork(Network):
             # eval global model
             leader.model.set_params(new_global_params)
             _, gloabl_acc = leader.evaluate(
-                model=leader.model, x=X_test, y=y_test, B=64)
+                model=leader.model, x=self.X_test, y=self.y_test, B=64)
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
+            print(f"global round {i} accuracy: {gloabl_acc}")
             global_accuracy.append(gloabl_acc)
             # append block to blockchain
             self.add_block(new_block)
@@ -308,7 +309,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
     """
     (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
                                                                            n_class=10,
-                                                                           n_samples=1000,
+                                                                           n_samples=250,
                                                                            rate_unbalance=1.0,
                                                                            )
     X_test = torch.tensor(X_test).float()
@@ -335,7 +336,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=128
+                B=64
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
@@ -373,7 +374,7 @@ def centralized_training(rounds):
         test_dataset, batch_size=64, shuffle=False)
 
     model = LeNet_Small_Quant()
-    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.001))
+    model.set_optimizer(torch.optim.Adam(model.parameters(), lr=0.0001))
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
     model.to(device)
     print("training on ", device)
@@ -556,7 +557,7 @@ def test(rounds: int):
     
 
 if __name__ == '__main__':
-    # acc = centralized_training(30)
+    # acc = centralized_training(200)
     # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
     # net = ZKFLChain(num_clients=1,
     #                 global_rounds=1,
@@ -569,8 +570,14 @@ if __name__ == '__main__':
     # plt.xlabel("Epoch")
     # plt.ylabel("Accuracy")
     # plt.show()
-    # net = POFLNetWork(num_clients=5, global_rounds=1, local_rounds=5, frac_malicous=0.3, dataset='cifar10', model='lenet')
-    # net.run()
-    path = 'pretrained_model/LeNet_CIFAR_pretrained'
-    zkfl.generate_proof(path)
-    
+    # net = POFLNetWork(num_clients=20, global_rounds=100, local_rounds=5, frac_malicous=0.0, dataset='cifar10', model='lenet')
+    # acc = net.run()
+    # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
+    acc = centralized_dp(rounds=200)
+    plt.plot(acc)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.show()
+    # np.savetxt('vanilla_acc_200.txt', np.array(acc))
+    # np.savetxt('centralized_acc.txt', np.array(acc))
+    np.savetxt('centralized_dp_acc.txt', np.array(acc))
