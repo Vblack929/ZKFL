@@ -189,7 +189,7 @@ class Worker:
             self.model.to("cpu")
             self.model.qconfig = torch.quantization.get_default_qconfig(
                 'fbgemm')
-            print(self.model.qconfig)
+            # print(self.model.qconfig)
             model_prepared = torch.quantization.prepare(self.model)
             # Calibrate the model
             for i in (t := trange(10)):

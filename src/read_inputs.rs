@@ -157,7 +157,7 @@ pub fn read_lenet_model(
         32,
     ); // only read one image
     let true_labels: Vec<u8> = read_vector1d(
-        format!("{}/Lenet_Small_classification.txt", path),
+        format!("{}/classification.txt", path),
         100,
     ); //read 100 image inference results
     let conv1_w: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(

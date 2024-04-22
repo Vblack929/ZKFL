@@ -78,7 +78,7 @@ class Network(blockchain.Blockchain):
             self.workers = np.random.choice(
                 list(self.peers), self.num_clients, replace=False)
         # assign data to clients
-        global_params = self.model.get_params()
+        global_params = self.last_block.global_params
         for i, worker in enumerate(self.workers):
             worker.X_train = self.X_train[i]
             worker.y_train = self.y_train[i]
@@ -191,7 +191,7 @@ class POFLNetWork(Network):
     def local_train(self, B):
         for worker in self.workers:
             worker.model.set_optimizer(torch.optim.Adam(
-                worker.model.parameters(), lr=0.0001))
+                worker.model.parameters(), lr=0.001))
             worker.train_step_dp(
                 model=worker.model,
                 K=self.local_rounds,
@@ -214,12 +214,11 @@ class ZKFLChain(Network):
                          model=model)
 
     def run(self):
-        log = {}
-        malicious = []  # used to store workers that failed to generate proof
+        log = {}  # used to store workers that failed to generate proof
         acc_dict = {}
         global_accuracy = []
         # public test set
-        X_test, y_test = self.X_test[:100], self.y_test[:100]
+        X_test, y_test = self.X_test[:1000], self.y_test[:1000]
 
         for i in range(1, self.global_rounds+1):
             self.init_network()
@@ -230,28 +229,30 @@ class ZKFLChain(Network):
             self.local_train(B=64)
             print("Local training done")
             # quantize model
-            for worker in self.workers:
-                worker.quantize_model()
-                dump_path = f'pretrained_models/worker_{worker.index}/'
-                # # clear the path if not empty
-                if os.path.exists(dump_path):
-                    for file in os.listdir(dump_path):
-                        file_path = os.path.join(dump_path, file)
-                        os.remove(file_path)
-                    # pass
-                else:
-                    os.makedirs(dump_path)
-                acc = worker.quantized_model_forward(
-                    x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
-                # acc_dict[i][worker.index] = acc
-                worker.dump_path = dump_path
+            # for worker in self.workers:
+            #     worker.quantize_model()
+            #     dump_path = f'pretrained_models/worker_{worker.index}/'
+            #     # # clear the path if not empty
+            #     if os.path.exists(dump_path):
+            #         for file in os.listdir(dump_path):
+            #             file_path = os.path.join(dump_path, file)
+            #             os.remove(file_path)
+            #         # pass
+            #     else:
+            #         os.makedirs(dump_path)
+            #     acc = worker.quantized_model_forward(
+            #         x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
+            #     # acc_dict[i][worker.index] = acc
+            #     worker.dump_path = dump_path
 
             # eval and generate proof
+            malicious = []
             for worker in self.workers:
-                acc = float(zkfl.generate_proof(worker.dump_path))
+                # acc = float(zkfl.generate_proof(worker.dump_path))
+                _, acc = worker.evaluate(model=worker.model, x=X_test, y=y_test, B=128)
                 claimed_acc = worker.local_update(acc=acc)["accuracy"]
-                print(f"worker {worker.index} acc ", acc)
-                print(f"worker {worker.index} claimed acc ", claimed_acc)
+                # print(f"worker {worker.index} acc ", acc)
+                # print(f"worker {worker.index} claimed acc ", claimed_acc)
                 if acc == claimed_acc:
                     print(f"Worker {worker.index} proof verified")
                 else:
@@ -264,6 +265,7 @@ class ZKFLChain(Network):
             # leader would be the first honest worker in the transaction pool
             leader_id = next(
                 (tx.sender_id for tx in self.transaction_pool if tx.sender_id not in malicious), None)
+            print("leader id", leader_id)
             leader = [
                 worker for worker in self.workers if worker.index == leader_id][0]
             # leader perform aggregation
@@ -278,6 +280,7 @@ class ZKFLChain(Network):
                 agg = federated_learning.FedAvg(
                     global_model=self.model)
             else:  # leader is malicious and will perform guassian attack
+                print("Leader is malicious")
                 agg = federated_learning.GuassianAttack(
                     global_model=self.model
                 )
@@ -286,7 +289,8 @@ class ZKFLChain(Network):
                 local_params=[tx.params for tx in new_block.transactions])
             leader.model.set_params(new_global_params)
             _, gloabl_acc = leader.evaluate(
-                model=leader.model, x=X_test, y=y_test, B=128)
+                model=leader.model, x=self.X_test, y=self.y_test, B=128)
+            print(f"global round {i} accuracy: {gloabl_acc}")
             new_block.global_params = new_global_params
             new_block.global_accuracy = gloabl_acc
 
@@ -569,25 +573,22 @@ def test(rounds: int):
 if __name__ == '__main__':
     # acc = centralized_training(200)
     # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
-    # net = ZKFLChain(num_clients=1,
-    #                 global_rounds=1,
+    # net = ZKFLChain(num_clients=20,
+    #                 global_rounds=200,
     #                 local_rounds=5,
-    #                 frac_malicous=0.0,
+    #                 frac_malicous=0.3,
     #                 dataset='cifar10',
     #                 model='lenet')
-    # acc = net.run()
-    # plt.plot(acc)
-    # plt.xlabel("Epoch")
-    # plt.ylabel("Accuracy")
-    # plt.show()
-    # net = POFLNetWork(num_clients=20, global_rounds=100, local_rounds=5, frac_malicous=0.0, dataset='cifar10', model='lenet')
-    # acc = net.run()
-    # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
-    acc = centralized_dp(rounds=200)
+    net = POFLNetWork(num_clients=20,
+                      global_rounds=100,
+                      local_rounds=5,
+                      frac_malicous=0.0,
+                      dataset='cifar10',
+                      model='lenet')
+    acc = net.run()
     plt.plot(acc)
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
+    plt.xlabel("Global rounds")
+    plt.ylabel("Global accuracy")
     plt.show()
-    # np.savetxt('vanilla_acc_200.txt', np.array(acc))
-    # np.savetxt('centralized_acc.txt', np.array(acc))
-    np.savetxt('centralized_dp_acc.txt', np.array(acc))
+    # np.savetxt('zkfl_acc_with_mal200.txt', np.array(acc))
+    

@@ -2,20 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Data for plotting
-fl_dp = np.loadtxt('fl_dp.txt')
-fl_without_dp = np.loadtxt('vanilla_acc.txt')
-cl = np.loadtxt('centralized_acc.txt')
+zkfl_by = np.loadtxt('zkfl_acc_with_mal.txt')
+zkfl_no_by = np.loadtxt('zkfl_acc_without_mal.txt')
 
 # plot these accuracy in the same plot
 fig, ax = plt.subplots()
-ax.plot(fl_dp, label='FL with DP')
-ax.plot(fl_without_dp, label='FL without DP')
-ax.plot(cl, label='Centralized')
+ax.plot(zkfl_by, label='with Byzantine attack')
+ax.plot(zkfl_no_by, label='without Byzantine attack')
 ax.set(xlabel='Epochs', ylabel='Accuracy',
-       title='Accuracy of FL with and without DP')
+       title='Accuracy of FL with and without Byzantine attack')
 ax.legend()
 ax.grid()
 plt.show()
 
 # save the plot
-fig.savefig("acc.png")
+# fig.savefig("acc.png")
+fig.savefig("byzantine.png")
