@@ -198,7 +198,7 @@ class POFLNetWork(Network):
                 B=B,
                 norm=1.2,
                 eps=50.0,
-                delta=1e-5,
+                delta=1e-2,
             )
 
 
@@ -590,5 +590,5 @@ if __name__ == '__main__':
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    # np.savetxt('zkfl_acc_with_mal200.txt', np.array(acc))
+    np.savetxt('fl_dp_2delta.txt', np.array(acc))
     
