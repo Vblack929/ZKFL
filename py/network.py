@@ -490,7 +490,7 @@ def centralized_dp(rounds: int):
         data_loader=train_loader,
         epochs=rounds,
         target_epsilon=50.0,
-        target_delta=1e-5,
+        target_delta=1e-2,
         max_grad_norm=1.2,
     )
 
@@ -534,10 +534,7 @@ def centralized_dp(rounds: int):
         print(f"test epoch {k}: loss {loss}, acc {acc}")
 
     # plot the test accuracy
-    plt.plot(test_acc)
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.show()
+    return test_acc 
 
 
 def test(rounds: int):
@@ -580,15 +577,16 @@ if __name__ == '__main__':
     #                 dataset='cifar10',
     #                 model='lenet')
     net = POFLNetWork(num_clients=20,
-                      global_rounds=100,
+                      global_rounds=20,
                       local_rounds=5,
                       frac_malicous=0.0,
                       dataset='cifar10',
                       model='lenet')
     acc = net.run()
+    # acc = centralized_dp(rounds=10)
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    np.savetxt('fl_dp_2delta.txt', np.array(acc))
+    # np.savetxt('zkfl_acc_with_mal200.txt', np.array(acc))
     
