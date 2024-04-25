@@ -62,6 +62,45 @@ class FLModel(torch.nn.Module):
                 acc += self.calc_acc(logits, y[b*B:(b+1)*B])
 
         return err / n_batches, acc / n_batches
+    
+class LeNet_MNIST(FLModel):
+    def __init__(self):
+        super(LeNet_MNIST, self).__init__()
+        self.loss_fn = nn.CrossEntropyLoss(reduction='mean')
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=6,
+                               kernel_size=5, stride=1, bias=False)
+        self.act1 = nn.ReLU()
+        self.pool1 = nn.AvgPool2d(kernel_size=2)
+        self.conv2 = nn.Conv2d(
+            in_channels=6, out_channels=16, kernel_size=5, stride=1, bias=False)
+        self.act2 = nn.ReLU()
+        self.pool2 = nn.AvgPool2d(kernel_size=2)
+        self.conv3 = nn.Conv2d(
+            in_channels=16, out_channels=120, kernel_size=4, stride=1, bias=False)
+        self.act3 = nn.ReLU()
+        self.linear1 = nn.Linear(in_features=480, out_features=84)
+        self.act4 = nn.ReLU()
+        self.linear2 = nn.Linear(in_features=84, out_features=10)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.pool2(x)
+        x = self.conv3(x)
+        x = self.act3(x)
+        x = x.reshape(x.size(0), -1)
+        x = self.linear1(x)
+        x = self.act4(x)
+        x = self.linear2(x)
+        return x
+    
+    def quant_input(self, x):
+        x = torch.tensor(x).float()
+        x_quant = self.quant(x)
+        return x_quant.int_repr().numpy(), x_quant.q_scale(), x_quant.q_zero_point()
 
 
 class LeNet_Small_Quant(FLModel):
