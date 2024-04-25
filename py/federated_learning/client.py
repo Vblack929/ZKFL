@@ -86,7 +86,7 @@ class Worker:
             if k % 10 == 0:
                 print(f"Worker {self.index} local epoch {k}: loss {loss}")
                 
-    def train_step_dp(self, model, K, B, norm, eps, delta):
+    def train_step_dp(self, model, K, B, norm, eps, delta, noise):
         if self.dataset is None:
             dataset = TensorDataset(torch.from_numpy(self.X_train).float(), torch.from_numpy(self.y_train).long())
             self.dataset = dataset  # save the dataset
@@ -98,14 +98,15 @@ class Worker:
         # create privacy engine
         privacy_engine = PrivacyEngine()
         
-        model, optim, train_loader = privacy_engine.make_private_with_epsilon(
+        model, optim, train_loader = privacy_engine.make_private(
             module=model,
             optimizer=model.optim,
             data_loader=train_loader,
-            epochs=K,
-            target_epsilon=eps,
-            target_delta=delta,
+            # epochs=K,
+            # target_epsilon=eps,
+            # target_delta=delta,
             max_grad_norm=norm,
+            noise_multiplier=noise
         )
         
         for k in range(1, K+1):

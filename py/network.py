@@ -197,8 +197,9 @@ class POFLNetWork(Network):
                 K=self.local_rounds,
                 B=B,
                 norm=1.2,
-                eps=50.0,
-                delta=1e-2,
+                eps=500.0,
+                delta=1e-5,
+                noise=1.5
             )
 
 
@@ -490,7 +491,7 @@ def centralized_dp(rounds: int):
         data_loader=train_loader,
         epochs=rounds,
         target_epsilon=50.0,
-        target_delta=1e-2,
+        target_delta=1e-5,
         max_grad_norm=1.2,
     )
 
@@ -534,7 +535,10 @@ def centralized_dp(rounds: int):
         print(f"test epoch {k}: loss {loss}, acc {acc}")
 
     # plot the test accuracy
-    return test_acc 
+    plt.plot(test_acc)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.show()
 
 
 def test(rounds: int):
@@ -577,16 +581,15 @@ if __name__ == '__main__':
     #                 dataset='cifar10',
     #                 model='lenet')
     net = POFLNetWork(num_clients=20,
-                      global_rounds=20,
+                      global_rounds=100,
                       local_rounds=5,
                       frac_malicous=0.0,
                       dataset='cifar10',
                       model='lenet')
     acc = net.run()
-    # acc = centralized_dp(rounds=10)
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    # np.savetxt('zkfl_acc_with_mal200.txt', np.array(acc))
+    np.savetxt('fl_dp_500eps.txt', np.array(acc))
     
