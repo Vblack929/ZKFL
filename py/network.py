@@ -199,7 +199,7 @@ class POFLNetWork(Network):
                 norm=1.2,
                 eps=500.0,
                 delta=1e-5,
-                noise=1.5
+                noise=1.0
             )
 
 
@@ -581,15 +581,17 @@ if __name__ == '__main__':
     #                 dataset='cifar10',
     #                 model='lenet')
     net = POFLNetWork(num_clients=20,
-                      global_rounds=100,
+                      global_rounds=200,
                       local_rounds=5,
                       frac_malicous=0.0,
                       dataset='cifar10',
                       model='lenet')
+    # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
     acc = net.run()
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    np.savetxt('fl_dp_500eps.txt', np.array(acc))
+    # np.savetxt('cl_200.txt', np.array(acc))
+    # np.savetxt('fl_200.txt', np.array(acc))
     
