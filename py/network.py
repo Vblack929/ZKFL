@@ -577,7 +577,7 @@ if __name__ == '__main__':
     net = ZKFLChain(num_clients=20,
                     global_rounds=200,
                     local_rounds=5,
-                    frac_malicous=0.3,
+                    frac_malicous=0.0,
                     dataset='cifar10',
                     model='lenet')
     # net = POFLNetWork(num_clients=20,
