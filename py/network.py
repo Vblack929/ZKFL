@@ -199,7 +199,7 @@ class POFLNetWork(Network):
                 norm=1.2,
                 eps=500.0,
                 delta=1e-5,
-                noise=1.0
+                noise=1.5
             )
 
 
@@ -574,24 +574,25 @@ def test(rounds: int):
 if __name__ == '__main__':
     # acc = centralized_training(200)
     # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
-    # net = ZKFLChain(num_clients=20,
-    #                 global_rounds=200,
-    #                 local_rounds=5,
-    #                 frac_malicous=0.3,
-    #                 dataset='cifar10',
-    #                 model='lenet')
-    net = POFLNetWork(num_clients=20,
-                      global_rounds=200,
-                      local_rounds=5,
-                      frac_malicous=0.0,
-                      dataset='cifar10',
-                      model='lenet')
+    net = ZKFLChain(num_clients=20,
+                    global_rounds=200,
+                    local_rounds=5,
+                    frac_malicous=0.3,
+                    dataset='cifar10',
+                    model='lenet')
+    # net = POFLNetWork(num_clients=20,
+    #                   global_rounds=200,
+    #                   local_rounds=5,
+    #                   frac_malicous=0.0,
+    #                   dataset='cifar10',
+    #                   model='lenet')
     # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
     acc = net.run()
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
+    np.savetxt("zk_mal.txt", np.array(acc))
     # np.savetxt('cl_200.txt', np.array(acc))
     # np.savetxt('fl_200.txt', np.array(acc))
     
