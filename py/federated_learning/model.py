@@ -65,7 +65,8 @@ class FLModel(torch.nn.Module):
     
 class LeNet_MNIST(FLModel):
     def __init__(self):
-        super(LeNet_MNIST, self).__init__()
+        device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+        super(LeNet_MNIST, self).__init__(device=device)
         self.loss_fn = nn.CrossEntropyLoss(reduction='mean')
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=6,
                                kernel_size=5, stride=1, bias=False)
@@ -78,7 +79,7 @@ class LeNet_MNIST(FLModel):
         self.conv3 = nn.Conv2d(
             in_channels=16, out_channels=120, kernel_size=4, stride=1, bias=False)
         self.act3 = nn.ReLU()
-        self.linear1 = nn.Linear(in_features=480, out_features=84)
+        self.linear1 = nn.Linear(in_features=120, out_features=84)
         self.act4 = nn.ReLU()
         self.linear2 = nn.Linear(in_features=84, out_features=10)
     
@@ -101,6 +102,9 @@ class LeNet_MNIST(FLModel):
         x = torch.tensor(x).float()
         x_quant = self.quant(x)
         return x_quant.int_repr().numpy(), x_quant.q_scale(), x_quant.q_zero_point()
+    
+    def calc_acc(self, logits, y):
+        return torch.mean((torch.argmax(logits, dim=1) == y).float()).item()
 
 
 class LeNet_Small_Quant(FLModel):

@@ -7,6 +7,7 @@ import os
 import json
 import scipy.sparse
 from torchvision import datasets, transforms
+from torch.utils.data import Subset
 
 
 class DataFeeder():
@@ -223,6 +224,40 @@ def load_cifar10(num_users, n_class, n_samples, rate_unbalance):
         train_y = train_labels[idx]
         train_xs.append(train_x)
         train_ys.append(train_y)
+
+    return (train_xs, train_ys), (np.array(test_imgs), np.array(test_labels))
+
+def load_mnist(num_users):
+    # Load MNIST dataset
+    transform = transforms.Compose([
+        transforms.ToTensor(), 
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    test_dataset = datasets.MNIST('./data', train=False, transform=transform)
+
+    # Split train dataset into num_users subsets and create list of numpy arrays
+    train_data_size = len(train_dataset)
+    indices = list(range(train_data_size))
+    split = train_data_size // num_users
+
+    train_xs, train_ys = [], []
+    for i in range(num_users):
+        start = i * split
+        end = (i + 1) * split if i != num_users - 1 else train_data_size
+        idx = indices[start:end]
+        subset = Subset(train_dataset, idx)
+        
+        # Extract images and labels as numpy arrays
+        imgs = [np.array(subset.dataset[i][0].numpy()) for i in idx]
+        labels = [subset.dataset[i][1] for i in idx]
+        
+        train_xs.append(np.array(imgs))
+        train_ys.append(np.array(labels))
+
+    # Prepare test images and labels as numpy arrays
+    test_imgs = [np.array(test_dataset[i][0].numpy()) for i in range(len(test_dataset))]
+    test_labels = [test_dataset[i][1] for i in range(len(test_dataset))]
 
     return (train_xs, train_ys), (np.array(test_imgs), np.array(test_labels))
 

@@ -12,7 +12,7 @@ import zkfl
 import blockchain
 import federated_learning
 from federated_learning.client import Worker
-from federated_learning.model import LeNet_Small_Quant
+from federated_learning.model import LeNet_Small_Quant, LeNet_MNIST
 
 warnings.filterwarnings("ignore")
 
@@ -321,11 +321,12 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
     """ 
     A simple federated learning network with no malicious clients.
     """
-    (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
-                                                                           n_class=10,
-                                                                           n_samples=250,
-                                                                           rate_unbalance=1.0,
-                                                                           )
+    # (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
+    #                                                                        n_class=10,
+    #                                                                        n_samples=250,
+    #                                                                        rate_unbalance=1.0,
+    #                                                                        )
+    (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
     X_test = torch.tensor(X_test).float()
     y_test = torch.tensor(y_test).long()
     workers = []
@@ -335,11 +336,11 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                         y_train=y_train[i],
                         X_test=None,
                         y_test=None,
-                        model=LeNet_Small_Quant(),
+                        model=LeNet_MNIST(),
                         )
         workers.append(worker)
 
-    global_model = LeNet_Small_Quant()
+    global_model = LeNet_MNIST()
     global_accuracy = []
     for i in range(1, global_rounds+1):
         global_params = global_model.get_params()
@@ -573,13 +574,13 @@ def test(rounds: int):
 
 if __name__ == '__main__':
     # acc = centralized_training(200)
-    # acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
-    net = ZKFLChain(num_clients=20,
-                    global_rounds=200,
-                    local_rounds=5,
-                    frac_malicous=0.0,
-                    dataset='cifar10',
-                    model='lenet')
+    acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
+    # net = ZKFLChain(num_clients=20,
+    #                 global_rounds=200,
+    #                 local_rounds=5,
+    #                 frac_malicous=0.0,
+    #                 dataset='cifar10',
+    #                 model='lenet')
     # net = POFLNetWork(num_clients=20,
     #                   global_rounds=200,
     #                   local_rounds=5,
@@ -587,12 +588,12 @@ if __name__ == '__main__':
     #                   dataset='cifar10',
     #                   model='lenet')
     # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
-    acc = net.run()
+    # acc = net.run()
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    np.savetxt("zk_mal.txt", np.array(acc))
+    np.savetxt("fl_mnist.txt", np.array(acc))
     # np.savetxt('cl_200.txt', np.array(acc))
     # np.savetxt('fl_200.txt', np.array(acc))
     
