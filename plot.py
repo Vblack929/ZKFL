@@ -16,21 +16,23 @@ ax.plot(fl_noise_3, label="noise level = 1.5")
 # ax.plot(cl, label="CL")
 ax.set(xlabel='Round', ylabel='Accuracy',
        )
-ax.grid(True)
+# ax.grid(True)
 plt.legend()
 plt.show()
+fig.savefig("noise.png")
 
-# no_byzantine = np.loadtxt("zk_nomal.txt")
-# byzantine = np.loadtxt('zk_mal.txt')
+# byzantine = np.loadtxt("log/fl_200.txt")
+# no_byzantine = np.loadtxt('log/vanilla_acc_200.txt')
 # # plot these accuracy in the same plot
 # fig, ax = plt.subplots()
 # ax.plot(no_byzantine, label="No Byzantine")
 # ax.plot(byzantine, label="Byzantine")
 # ax.set(xlabel='Round', ylabel='Accuracy',
 #        )
-# ax.grid(True)
+# # ax.grid(True)
 # plt.legend()
-# plt.show()
+# # plt.show()
+# fig.savefig("byzantine3.png")
 
 
 # save the plot

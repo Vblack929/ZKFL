@@ -105,6 +105,37 @@ class LeNet_MNIST(FLModel):
     
     def calc_acc(self, logits, y):
         return torch.mean((torch.argmax(logits, dim=1) == y).float()).item()
+    
+    def dump_feat_param(self):
+        dummy_image = torch.tensor(np.ones((1, 1, 28, 28))).float()
+        x = self.quant(dummy_image)
+        conv1 = self.conv1(x)
+        act1 = self.act1(conv1)
+        pool1 = self.pool1(act1)
+        conv2 = self.conv2(pool1)
+        act2 = self.act2(conv2)
+        pool2 = self.pool2(act2)
+        conv3 = self.conv3(pool2)
+        act3 = self.act3(conv3)
+        view_output = act3.reshape(act3.size(0), -1)
+        linear1 = self.linear1(view_output)
+        act4 = self.act4(linear1)
+        linear2 = self.linear2(act4)
+        output = self.dequant(linear2)
+        feature_quantize_parameters = {'x_q_scale': x.q_scale(), 'x_q_zero_point': x.q_zero_point(),
+                                       "conv1_q_scale": conv1.q_scale(), 'conv1_q_zero_point': conv1.q_zero_point(),
+                                       'act1_q_scale': act1.q_scale(), "act1_q_zero_point": act1.q_zero_point(),
+                                       'pool1_q_scale': pool1.q_scale(), 'pool1_q_zero_point': pool1.q_zero_point(),
+                                       'conv2_q_scale': conv2.q_scale(), "conv2_q_zero_point": conv2.q_zero_point(),
+                                       "act2_q_scale": act2.q_scale(), "act2_q_zero_point": act2.q_zero_point(),
+                                       'pool2_q_scale': pool2.q_scale(), "pool2_q_zero_point": pool2.q_zero_point(),
+                                       "conv3_q_scale": conv3.q_scale(), "conv3_q_zero_point": conv3.q_zero_point(),
+                                       "act3_q_scale": act3.q_scale(), "act3_q_zero_point": act3.q_zero_point(),
+                                       "linear1_q_scale": linear1.q_scale(), "linear1_q_zero_point": linear1.q_zero_point(),
+                                       "act4_q_scale": act4.q_scale(), "act4_q_zero_point": act4.q_zero_point(),
+                                       "linear2_q_scale": linear2.q_scale(), "linear2_q_zero_point": linear2.q_zero_point()
+                                       }
+        return feature_quantize_parameters
 
 
 class LeNet_Small_Quant(FLModel):
