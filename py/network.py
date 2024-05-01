@@ -223,7 +223,7 @@ class ZKFLChain(Network):
         acc_dict = {}
         global_accuracy = []
         # public test set
-        X_test, y_test = self.X_test[:1000], self.y_test[:1000]
+        X_test, y_test = self.X_test[:100], self.y_test[:100]
 
         for i in range(1, self.global_rounds+1):
             self.init_network()
@@ -273,6 +273,20 @@ class ZKFLChain(Network):
             print("leader id", leader_id)
             leader = [
                 worker for worker in self.workers if worker.index == leader_id][0]
+            # generate proof to test the time
+            leader.quantize_model() 
+            dump_path = f'pretrained_models/worker_{leader.index}/'
+            start = time.time()
+            acc = leader.quantized_model_forward(
+                x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
+            end = time.time()
+            eval_time = end - start
+            print(f"Leader {leader.index} evaluation time: {eval_time}")
+            start = time.time()
+            generate_acc = float(zkfl.generate_proof(dump_path))
+            end = time.time()
+            proof_time = end - start
+            print(f"Leader {leader.index} proof generation time: {proof_time}")
             # leader perform aggregation
             new_block = blockchain.Block(index=len(self),
                                          transactions=self.transaction_pool,
