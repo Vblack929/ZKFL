@@ -33,6 +33,8 @@ class Network(blockchain.Blockchain):
 
         if model.lower() == 'lenet':
             self.model = LeNet_Small_Quant()
+        elif model.lower() == 'lenet_mnist':
+            self.model = LeNet_MNIST()
         super().__init__(consensus=consensus, max_nodes=100,
                          model=self.model, task=dataset, path=path)
         self.num_clients = num_clients
@@ -49,16 +51,18 @@ class Network(blockchain.Blockchain):
                                                                                    n_samples=n_samples,
                                                                                    rate_unbalance=1.0,
                                                                                    )
+        elif self.dataset.lower() == 'mnist':
+            (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=self.num_clients)
         self.X_train, self.y_train = X_train, y_train
         self.X_test, self.y_test = X_test, y_test
 
         for i in range(1, self.max_nodes+1):
             if i <= self.num_malicous:
                 node = Worker(index=i, X_train=None, y_train=None, X_test=None,
-                              y_test=None, model=LeNet_Small_Quant(), malicious=True)
+                              y_test=None, model=LeNet_MNIST(), malicious=True)
             else:
                 node = Worker(index=i, X_train=None, y_train=None, X_test=None,
-                              y_test=None, model=LeNet_Small_Quant(), malicious=False)
+                              y_test=None, model=LeNet_MNIST(), malicious=False)
             self.peers.add(node)
 
     def init_network(self):
@@ -108,10 +112,10 @@ class POFLNetWork(Network):
             # workers load global params from the last block
             global_params = self.last_block.global_params
             for w in self.workers:
-                w.model = LeNet_Small_Quant()
+                w.model = LeNet_MNIST()
                 w.set_params(global_params)
             # local training
-            self.local_train(B=64)
+            self.local_train(B=128)
             print("Local training done")
             # evaluate and send tx
             for worker in self.workers:
@@ -227,7 +231,7 @@ class ZKFLChain(Network):
             print(f"Global round {i}")
             # workers load global params from the last block
             # local training
-            self.local_train(B=64)
+            self.local_train(B=128)
             print("Local training done")
             # quantize model
             # for worker in self.workers:
@@ -351,14 +355,14 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=64
+                B=128
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
             global_model=global_model)
         new_global_params = agg.aggregate(local_params=local_params)
         global_model.set_params(new_global_params)
-        _, acc = global_model.eval_step(x=X_test, y=y_test, B=64)
+        _, acc = global_model.eval_step(x=X_test, y=y_test, B=128)
         print(f"Global round {i}: accuracy {acc}")
         global_accuracy.append(acc)
 
@@ -574,26 +578,27 @@ def test(rounds: int):
 
 if __name__ == '__main__':
     # acc = centralized_training(200)
-    acc = vanillia_fl(num_clients=5, global_rounds=30, local_rounds=20)
+    # acc = vanillia_fl(num_clients=20, global_rounds=30, local_rounds=5)
     # net = ZKFLChain(num_clients=20,
-    #                 global_rounds=200,
+    #                 global_rounds=100,
     #                 local_rounds=5,
     #                 frac_malicous=0.0,
-    #                 dataset='cifar10',
-    #                 model='lenet')
-    # net = POFLNetWork(num_clients=20,
-    #                   global_rounds=200,
-    #                   local_rounds=5,
-    #                   frac_malicous=0.0,
-    #                   dataset='cifar10',
-    #                   model='lenet')
+    #                 dataset='mnist',
+    #                 model='lenet_mnist')
+    net = POFLNetWork(num_clients=20,
+                      global_rounds=200,
+                      local_rounds=5,
+                      frac_malicous=0.0,
+                      dataset='mnist',
+                      model='lenet_mnist')
     # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
-    # acc = net.run()
+    acc = net.run()
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    np.savetxt("fl_mnist.txt", np.array(acc))
+    np.savetxt("pofl_mnist1.5.txt", np.array(acc))
+    # np.savetxt("fl_mnist.txt", np.array(acc))
     # np.savetxt('cl_200.txt', np.array(acc))
     # np.savetxt('fl_200.txt', np.array(acc))
     
