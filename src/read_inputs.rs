@@ -124,6 +124,169 @@ pub fn read_vector4d(
     res
 }
 
+pub fn read_mnist_model(
+    path: String,
+) -> (Vec<Vec<Vec<Vec<u8>>>>, 
+    Vec<u8>, 
+    Vec<Vec<Vec<Vec<u8>>>>, 
+    Vec<Vec<Vec<Vec<u8>>>>, 
+    Vec<Vec<Vec<Vec<u8>>>>,
+    Vec<Vec<u8>>,
+    Vec<Vec<u8>>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<f32>,
+    Vec<f32>,
+    Vec<f32>,
+    Vec<f32>,
+    Vec<f32>,) {
+    let x: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(
+        format!("{}/X_q.txt", path),
+        10,
+        1,
+        28,
+        28,
+    ); // only read one image
+    let true_labels: Vec<u8> = read_vector1d(
+        format!("{}/classification.txt", path),
+        100,
+    ); //read 100 image inference results
+    let conv1_w: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(
+        format!("{}/LeNet_Small_conv1_weight_q.txt", path),
+        6,
+        3,
+        5,
+        5,
+    );
+    let conv2_w: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(
+        format!("{}/LeNet_Small_conv2_weight_q.txt", path),
+        16,
+        6,
+        5,
+        5,
+    );
+    let conv3_w: Vec<Vec<Vec<Vec<u8>>>> = read_vector4d(
+        format!("{}/LeNet_Small_conv3_weight_q.txt", path),
+        120,
+        16,
+        4,
+        4,
+    );
+    let fc1_w: Vec<Vec<u8>> = read_vector2d(
+        format!("{}/LeNet_Small_linear1_weight_q.txt", path),
+        84,
+        480,
+    );
+    let fc2_w: Vec<Vec<u8>> = read_vector2d(
+        format!("{}/LeNet_Small_linear2_weight_q.txt", path),
+        10,
+        84,
+    );
+
+    let x_0: Vec<u8> = read_vector1d(
+        format!("{}/X_z.txt", path),
+        1,
+    );
+    let conv1_output_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv1_output_z.txt", path),
+        1,
+    );
+    let conv2_output_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv2_output_z.txt", path),
+        1,
+    );
+    let conv3_output_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv3_output_z.txt", path),
+        1,
+    );
+    let fc1_output_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_linear1_output_z.txt", path),
+        1,
+    );
+    let fc2_output_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_linear2_output_z.txt", path),
+        1,
+    );
+
+    let conv1_weights_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv1_weight_z.txt", path),
+        1,
+    );
+    let conv2_weights_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv2_weight_z.txt", path),
+        1,
+    );
+    let conv3_weights_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_conv3_weight_z.txt", path),
+        1,
+    );
+    let fc1_weights_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_linear1_weight_z.txt", path),
+        1,
+    );
+    let fc2_weights_0: Vec<u8> = read_vector1d(
+        format!("{}/LeNet_Small_linear2_weight_z.txt", path),
+        1,
+    );
+
+    let multiplier_conv1: Vec<f32> = read_vector1d_f32(
+        format!("{}/LeNet_Small_conv1_weight_s.txt", path),
+        6,
+    );
+    let multiplier_conv2: Vec<f32> = read_vector1d_f32(
+        format!("{}/LeNet_Small_conv2_weight_s.txt", path),
+        16,
+    );
+    let multiplier_conv3: Vec<f32> = read_vector1d_f32(
+        format!("{}/LeNet_Small_conv3_weight_s.txt", path),
+        120,
+    );
+
+    let multiplier_fc1: Vec<f32> = read_vector1d_f32(
+        format!("{}/LeNet_Small_linear1_weight_s.txt", path),
+        84,
+    );
+    let multiplier_fc2: Vec<f32> = read_vector1d_f32(
+        format!("{}/LeNet_Small_linear2_weight_s.txt", path),
+        10,
+    );
+
+    (
+        x,
+        true_labels,
+        conv1_w,
+        conv2_w,
+        conv3_w,
+        fc1_w,
+        fc2_w,
+        x_0,
+        conv1_output_0,
+        conv2_output_0,
+        conv3_output_0,
+        fc1_output_0,
+        fc2_output_0,
+        conv1_weights_0,
+        conv2_weights_0,
+        conv3_weights_0,
+        fc1_weights_0,
+        fc2_weights_0,
+        multiplier_conv1,
+        multiplier_conv2,
+        multiplier_conv3,
+        multiplier_fc1,
+        multiplier_fc2,
+    )
+}
+
 pub fn read_lenet_model(
     path: String,
 ) -> (Vec<Vec<Vec<Vec<u8>>>>, 

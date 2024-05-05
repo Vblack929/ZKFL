@@ -60,13 +60,16 @@ def dump_txt(q, z, s, prefix):
         f2.write(str(s))
     f2.close()
     
-def quantized_lenet_forward(model, x, y, dump_flag, dump_path):
+def quantized_lenet_forward(model, x, y, dump_flag, dump_path, data="cifar10"):
     model_name = 'LeNet_Small'
     model = model
     weights = model.state_dict()
     feature_quantize_parameters = model.dump_feat_param()
     DUMP_FLAG = dump_flag
-    FC1_in_channel_num = 480
+    if data == "cifar10":
+        FC1_in_channel_num = 480
+    elif data == "mnist":
+        FC1_in_channel_num = 120
     path = dump_path
 
     x_quant_int_repr, x_quant_scale, x_quant_zero_point = model.quant_input(
@@ -143,3 +146,57 @@ def quantized_lenet_forward(model, x, y, dump_flag, dump_path):
     eval_acc = np.mean(y_test_pred == y)
 
     return eval_acc
+
+def quantized_mnist_forward(model, x, y, dump_flag, dump_path,):
+    model_name = "Shallow"
+    model = model
+    weights = model.state_dict()
+    l1_weight = weights['l1._packed_params._packed_params'][0]
+    l2_weight = weights['l2._packed_params._packed_params'][0]
+    finput_qscale, input_zero_point, l1_qscale, l1_zero_point, act_qscale, act_zero_point, l2_qscale, l2_zero_point = model.dump_feat_param()
+    assert l1_qscale == act_qscale, "Warning: l1_qscale != act_qscale. Voiate assumption in numpy inference."
+    assert l1_zero_point == act_zero_point, "Warning: l1_zero_point != act_zero_point. Voiate assumption in numpy inference."
+
+    DUMP_FLAG = dump_flag
+    # First quant on input x.
+    x_quant_int_repr, x_quant_scale, x_quant_zero_point = model.quant_input(x)
+    if DUMP_FLAG == True:
+        dump_txt(x_quant_int_repr, x_quant_zero_point, x_quant_scale, 'pretrained_model/X')
+
+    # 1st layer 
+    # weight
+    q1, z1, s1 = extract_uint_weight(l1_weight)
+    # input feature. 
+    # The input feature is indeed per_tensor_affine, instead of per_channel_affine.
+    q2 = x_quant_int_repr # suppose that x is integer
+    z2 = x_quant_zero_point
+    s2 = x_quant_scale
+    # output feature. q3 needs to be computed. z3 and s3 is fixed.
+    z3 = 128
+    s3 = l1_qscale
+    q3 = FullyConnected(q1, z1, s1, q2, z2, s2, z3, s3) # Here, q3
+    if DUMP_FLAG == True:
+        dump_txt(q1, z1, s1 * s2 / s3, 'pretrained_model/l1_weight')
+        dump_txt(q3, z3, 0, 'pretrained_model/l1_output')
+    # print("multiplier1 : {}".format(s1 * s2 / s3))
+    # Activation Function
+    act = np.maximum(q3, z3)
+
+    # 2nd layer.
+    # weight
+    q1, z1, s1 = extract_uint_weight(l2_weight)
+
+    # input feature. 
+    # The input feature is indeed per_tensor_affine, instead of per_channel_affine.
+    # Still use Per_channel_affine to use the same FullyConnected API.
+    q2, z2, s2 = act, z3, s3
+    # output feature. q3 needs to be computed. z3 and s3 is fixed.
+    z3 = 128
+    s3 = l2_qscale
+    q3 = FullyConnected(q1, z1, s1, q2, z2, s2, z3, s3)
+    if DUMP_FLAG == True:
+        dump_txt(q1, z1, s1 * s2 / s3, 'pretrained_model/l2_weight')
+        dump_txt(q3, z3, 0, 'pretrained_model/l2_output')
+    # print("multiplier2 : {}".format(s1 * s2 / s3))
+
+    return q3

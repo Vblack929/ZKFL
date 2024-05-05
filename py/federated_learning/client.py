@@ -13,7 +13,7 @@ from opacus import PrivacyEngine
 from tqdm import trange
 
 # Local application/library specific imports
-from federated_learning.utils import quantized_lenet_forward
+from federated_learning.utils import quantized_lenet_forward, quantized_mnist_forward
 from federated_learning.model import FLModel
 from blockchain import Transaction
 # from .attacks import ModelInversion, MemberInference
@@ -25,7 +25,7 @@ else:
 
 
 class Worker:
-    def __init__(self, index, X_train, y_train, X_test, y_test, model,  malicious=False, attack_type=None):
+    def __init__(self, index, X_train, y_train, X_test, y_test, model, task=None, malicious=False, attack_type=None):
         """ 
         Constructor for the `Worker` class.
         :param dataset: Dataset to be used for training.
@@ -42,6 +42,9 @@ class Worker:
         self.quantized = False
         self.dump_path = ''
         self.malicous = malicious
+        self.task = task
+        # if self.task == "mnist" and self.X_train is not None:
+        #     self.X_train = X_train.reshape(-1, 28 * 28)
 
     def set_params(self, new_params):
         """ 
@@ -85,6 +88,7 @@ class Worker:
                 loss, _ = model.train_step(x, y)
             if k % 10 == 0:
                 print(f"Worker {self.index} local epoch {k}: loss {loss}")
+        model.to("cpu")
                 
     def train_step_dp(self, model, K, B, norm, eps, delta, noise):
         if self.dataset is None:
@@ -123,6 +127,7 @@ class Worker:
             
             if k % 10 == 0:
                 print(f"Worker {self.index} local epoch {k}: loss {np.mean(losses)}")
+        model.to("cpu")
                 
         
     def evaluate(self, model, x, y, B):
@@ -138,6 +143,7 @@ class Worker:
         model.to(self.device)
         model.eval()
         err, acc = model.eval_step(x, y, B)
+        model.to("cpu")
         return err, acc
         
     
@@ -209,7 +215,11 @@ class Worker:
     def quantized_model_forward(self, x, y, dump_flag, dump_path='pretrained_model/LeNet_CIFAR_pretrained'):
         if not self.quantized:
             raise ValueError("Model is not quantized")
-        return quantized_lenet_forward(model=self.quantized_model, x=x, y=y, dump_flag=dump_flag, dump_path=dump_path) # dump the quantized model
+        if self.task == 'cifar10':
+            return quantized_lenet_forward(model=self.quantized_model, x=x, y=y, dump_flag=dump_flag, dump_path=dump_path)
+        elif self.task == "mnist":
+            return quantized_mnist_forward(model=self.quantized_model, x=x, y=y, dump_flag=dump_flag, dump_path=dump_path)
+        # return quantized_lenet_forward(model=self.quantized_model, x=x, y=y, dump_flag=dump_flag, dump_path=dump_path) # dump the quantized model
     
 # class MIAttacker(Worker):
 #     """ 

@@ -12,7 +12,7 @@ import zkfl
 import blockchain
 import federated_learning
 from federated_learning.client import Worker
-from federated_learning.model import LeNet_Small_Quant, LeNet_MNIST
+from federated_learning.model import LeNet_Small_Quant, LeNet_MNIST, ShallowNet_Quant
 
 warnings.filterwarnings("ignore")
 
@@ -33,7 +33,7 @@ class Network(blockchain.Blockchain):
 
         if model.lower() == 'lenet':
             self.model = LeNet_Small_Quant()
-        elif model.lower() == 'lenet_mnist':
+        elif model.lower() == 'shallownet':
             self.model = LeNet_MNIST()
         super().__init__(consensus=consensus, max_nodes=100,
                          model=self.model, task=dataset, path=path)
@@ -53,16 +53,19 @@ class Network(blockchain.Blockchain):
                                                                                    )
         elif self.dataset.lower() == 'mnist':
             (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=self.num_clients)
+            # for i in range(len(X_train)):
+            #     X_train[i] = X_train[i].reshape(-1, 28 * 28)
+            # X_test = X_test.reshape(-1, 28 * 28)
         self.X_train, self.y_train = X_train, y_train
         self.X_test, self.y_test = X_test, y_test
 
         for i in range(1, self.max_nodes+1):
             if i <= self.num_malicous:
                 node = Worker(index=i, X_train=None, y_train=None, X_test=None,
-                              y_test=None, model=LeNet_MNIST(), malicious=True)
+                              y_test=None, model=LeNet_MNIST(), malicious=True, task=self.dataset)
             else:
                 node = Worker(index=i, X_train=None, y_train=None, X_test=None,
-                              y_test=None, model=LeNet_MNIST(), malicious=False)
+                              y_test=None, model=LeNet_MNIST(), malicious=False, task=self.dataset)
             self.peers.add(node)
 
     def init_network(self):
@@ -115,7 +118,7 @@ class POFLNetWork(Network):
                 w.model = LeNet_MNIST()
                 w.set_params(global_params)
             # local training
-            self.local_train(B=128)
+            self.local_train(B=64)
             print("Local training done")
             # evaluate and send tx
             for worker in self.workers:
@@ -195,7 +198,7 @@ class POFLNetWork(Network):
     def local_train(self, B):
         for worker in self.workers:
             worker.model.set_optimizer(torch.optim.Adam(
-                worker.model.parameters(), lr=0.001))
+                worker.model.parameters(), lr=0.0001))
             worker.train_step_dp(
                 model=worker.model,
                 K=self.local_rounds,
@@ -276,6 +279,13 @@ class ZKFLChain(Network):
             # generate proof to test the time
             leader.quantize_model() 
             dump_path = f'pretrained_models/worker_{leader.index}/'
+            if os.path.exists(dump_path):
+                    for file in os.listdir(dump_path):
+                        file_path = os.path.join(dump_path, file)
+                        os.remove(file_path)
+                    # pass
+            else:
+                os.makedirs(dump_path)
             start = time.time()
             acc = leader.quantized_model_forward(
                 x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
@@ -334,6 +344,52 @@ class ZKFLChain(Network):
                 B=B
             )
 
+def fl_dp(num_clients, global_rounds, local_rounds, noise):
+    (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
+    for i in range(len(X_train)):
+            X_train[i] = X_train[i].reshape(-1, 28 * 28)
+            X_test = X_test.reshape(-1, 28 * 28)
+    X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
+    y_test = torch.tensor(y_test).long()
+    workers = []
+    for i in range(num_clients):
+        worker = Worker(index=i+1,
+                        X_train=X_train[i],
+                        y_train=y_train[i],
+                        X_test=None,
+                        y_test=None,
+                        model=ShallowNet_Quant(),
+                        )
+        workers.append(worker)
+
+    global_model = ShallowNet_Quant()
+    global_accuracy = []
+    for i in range(1, global_rounds+1):
+        torch.cuda.empty_cache()
+        global_params = global_model.get_params()
+        local_params = []
+        for w in workers:
+            w.model = ShallowNet_Quant()
+            w.set_params(global_params)
+            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.0001))
+            w.train_step_dp(
+                model=w.model,
+                K=local_rounds,
+                B=32,
+                norm=1.2,
+                eps=500.0,
+                delta=1e-5,
+                noise=noise
+            )
+            local_params.append(w.get_params())
+        agg = federated_learning.FedAvg(
+            global_model=global_model)
+        new_global_params = agg.aggregate(local_params=local_params)
+        global_model.set_params(new_global_params)
+        _, acc = global_model.eval_step(x=X_test, y=y_test, B=128)
+        print(f"Global round {i}: accuracy {acc}")
+        global_accuracy.append(acc)
+    return global_accuracy
 
 def vanillia_fl(num_clients, global_rounds, local_rounds):
     """ 
@@ -345,7 +401,10 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
     #                                                                        rate_unbalance=1.0,
     #                                                                        )
     (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
-    X_test = torch.tensor(X_test).float()
+    for i in range(len(X_train)):
+            X_train[i] = X_train[i].reshape(-1, 28 * 28)
+            X_test = X_test.reshape(-1, 28 * 28)
+    X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
     y_test = torch.tensor(y_test).long()
     workers = []
     for i in range(num_clients):
@@ -354,11 +413,11 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                         y_train=y_train[i],
                         X_test=None,
                         y_test=None,
-                        model=LeNet_MNIST(),
+                        model=ShallowNet_Quant(),
                         )
         workers.append(worker)
 
-    global_model = LeNet_MNIST()
+    global_model = ShallowNet_Quant()
     global_accuracy = []
     for i in range(1, global_rounds+1):
         global_params = global_model.get_params()
@@ -592,27 +651,39 @@ def test(rounds: int):
 
 if __name__ == '__main__':
     # acc = centralized_training(200)
-    # acc = vanillia_fl(num_clients=20, global_rounds=30, local_rounds=5)
+    # # acc = vanillia_fl(num_clients=20, global_rounds=30, local_rounds=5)
     # net = ZKFLChain(num_clients=20,
     #                 global_rounds=100,
     #                 local_rounds=5,
     #                 frac_malicous=0.0,
-    #                 dataset='mnist',
-    #                 model='lenet_mnist')
-    net = POFLNetWork(num_clients=20,
-                      global_rounds=200,
-                      local_rounds=5,
-                      frac_malicous=0.0,
-                      dataset='mnist',
-                      model='lenet_mnist')
+    #                 dataset='cifar10',
+    #                 model='lenet')
+    # net = POFLNetWork(num_clients=20,
+    #                   global_rounds=200,
+    #                   local_rounds=5,
+    #                   frac_malicous=0.0,
+    #                   dataset='mnist',
+    #                   model='shallownet')
     # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
-    acc = net.run()
+    acc = fl_dp(num_clients=20, global_rounds=200, local_rounds=5, noise=1.5)
+    # acc = net.run()
     plt.plot(acc)
     plt.xlabel("Global rounds")
     plt.ylabel("Global accuracy")
     plt.show()
-    np.savetxt("pofl_mnist1.5.txt", np.array(acc))
+    np.savetxt("dp_mnist1.5.txt", np.array(acc))
     # np.savetxt("fl_mnist.txt", np.array(acc))
     # np.savetxt('cl_200.txt', np.array(acc))
     # np.savetxt('fl_200.txt', np.array(acc))
+    # net.run()
     
+    # (X_train, Y_train), (X_test, Y_test) = federated_learning.load_mnist(num_users=1)
+
+    # worker = Worker(0, X_train[0], Y_train[0], X_test, Y_test, model=ShallowNet_Quant(), task="mnist")
+    # worker.set_optimizer(optimizer=torch.optim.Adam(worker.model.parameters(), lr=0.001))
+    # worker.train_step(model=worker.model, K=5, B=64)
+    # worker.quantize_model()
+    # dump_path = "pretrained_model\shallownet"
+    # worker.quantized_model_forward(X_test[:100].reshape(-1, 28 * 28), Y_test[:100], dump_flag=True, dump_path=dump_path)
+    
+    # zkfl.generate_mnist_proof()
