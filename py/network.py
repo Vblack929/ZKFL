@@ -53,9 +53,9 @@ class Network(blockchain.Blockchain):
                                                                                    )
         elif self.dataset.lower() == 'mnist':
             (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=self.num_clients)
-            # for i in range(len(X_train)):
-            #     X_train[i] = X_train[i].reshape(-1, 28 * 28)
-            # X_test = X_test.reshape(-1, 28 * 28)
+            for i in range(len(X_train)):
+                X_train[i] = X_train[i].reshape(-1, 28 * 28)
+            X_test = X_test.reshape(-1, 28 * 28)
         self.X_train, self.y_train = X_train, y_train
         self.X_test, self.y_test = X_test, y_test
 
@@ -276,27 +276,27 @@ class ZKFLChain(Network):
             print("leader id", leader_id)
             leader = [
                 worker for worker in self.workers if worker.index == leader_id][0]
-            # generate proof to test the time
-            leader.quantize_model() 
-            dump_path = f'pretrained_models/worker_{leader.index}/'
-            if os.path.exists(dump_path):
-                    for file in os.listdir(dump_path):
-                        file_path = os.path.join(dump_path, file)
-                        os.remove(file_path)
-                    # pass
-            else:
-                os.makedirs(dump_path)
-            start = time.time()
-            acc = leader.quantized_model_forward(
-                x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
-            end = time.time()
-            eval_time = end - start
-            print(f"Leader {leader.index} evaluation time: {eval_time}")
-            start = time.time()
-            generate_acc = float(zkfl.generate_proof(dump_path))
-            end = time.time()
-            proof_time = end - start
-            print(f"Leader {leader.index} proof generation time: {proof_time}")
+            # # generate proof to test the time
+            # leader.quantize_model() 
+            # dump_path = f'pretrained_models/worker_{leader.index}/'
+            # if os.path.exists(dump_path):
+            #         for file in os.listdir(dump_path):
+            #             file_path = os.path.join(dump_path, file)
+            #             os.remove(file_path)
+            #         # pass
+            # else:
+            #     os.makedirs(dump_path)
+            # start = time.time()
+            # acc = leader.quantized_model_forward(
+            #     x=X_test, y=y_test, dump_flag=True, dump_path=dump_path)
+            # end = time.time()
+            # eval_time = end - start
+            # print(f"Leader {leader.index} evaluation time: {eval_time}")
+            # start = time.time()
+            # generate_acc = float(zkfl.generate_proof(dump_path))
+            # end = time.time()
+            # proof_time = end - start
+            # print(f"Leader {leader.index} proof generation time: {proof_time}")
             # leader perform aggregation
             new_block = blockchain.Block(index=len(self),
                                          transactions=self.transaction_pool,
@@ -371,7 +371,7 @@ def fl_dp(num_clients, global_rounds, local_rounds, noise):
         for w in workers:
             w.model = ShallowNet_Quant()
             w.set_params(global_params)
-            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.0001))
+            w.set_optimizer(torch.optim.SGD(w.model.parameters(), lr=0.001))
             w.train_step_dp(
                 model=w.model,
                 K=local_rounds,
@@ -424,11 +424,11 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
         local_params = []
         for w in workers:
             w.set_params(global_params)
-            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.0001))
+            w.set_optimizer(torch.optim.SGD(w.model.parameters(), lr=0.001))
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=128
+                B=32
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
@@ -656,26 +656,23 @@ if __name__ == '__main__':
     #                 global_rounds=100,
     #                 local_rounds=5,
     #                 frac_malicous=0.0,
-    #                 dataset='cifar10',
-    #                 model='lenet')
+    #                 dataset='mnist',
+    #                 model='shallownet')
     # net = POFLNetWork(num_clients=20,
     #                   global_rounds=200,
     #                   local_rounds=5,
     #                   frac_malicous=0.0,
     #                   dataset='mnist',
     #                   model='shallownet')
-    # acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
-    acc = fl_dp(num_clients=20, global_rounds=200, local_rounds=5, noise=1.5)
-    # acc = net.run()
-    plt.plot(acc)
-    plt.xlabel("Global rounds")
-    plt.ylabel("Global accuracy")
-    plt.show()
-    np.savetxt("dp_mnist1.5.txt", np.array(acc))
-    # np.savetxt("fl_mnist.txt", np.array(acc))
-    # np.savetxt('cl_200.txt', np.array(acc))
-    # np.savetxt('fl_200.txt', np.array(acc))
-    # net.run()
+    acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
+    # np.savetxt("fl_mnist_no_mal.txt", np.array(acc))
+    # acc = fl_dp(num_clients=20, global_rounds=200, local_rounds=5, noise=0.5)
+    np.savetxt("fl_mnist_mal.txt", np.array(acc))
+    # # acc = net.run()
+    # plt.plot(acc)
+    # plt.xlabel("Global rounds")
+    # plt.ylabel("Global accuracy")
+    # plt.show()
     
     # (X_train, Y_train), (X_test, Y_test) = federated_learning.load_mnist(num_users=1)
 
