@@ -395,17 +395,18 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
     """ 
     A simple federated learning network with no malicious clients.
     """
-    # (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
-    #                                                                        n_class=10,
-    #                                                                        n_samples=250,
-    #                                                                        rate_unbalance=1.0,
-    #                                                                        )
-    (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
-    for i in range(len(X_train)):
-            X_train[i] = X_train[i].reshape(-1, 28 * 28)
-            X_test = X_test.reshape(-1, 28 * 28)
-    X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
-    y_test = torch.tensor(y_test).long()
+    (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
+                                                                           n_class=10,
+                                                                           n_samples=250,
+                                                                           rate_unbalance=1.0,
+                                                                           )
+    X_test, y_test = torch.tensor(X_test).float(), torch.tensor(y_test).long()
+    # (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
+    # for i in range(len(X_train)):
+    #         X_train[i] = X_train[i].reshape(-1, 28 * 28)
+    #         X_test = X_test.reshape(-1, 28 * 28)
+    # X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
+    # y_test = torch.tensor(y_test).long()
     workers = []
     for i in range(num_clients):
         worker = Worker(index=i+1,
@@ -413,11 +414,11 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
                         y_train=y_train[i],
                         X_test=None,
                         y_test=None,
-                        model=ShallowNet_Quant(),
+                        model=LeNet_Small_Quant(),
                         )
         workers.append(worker)
 
-    global_model = ShallowNet_Quant()
+    global_model = LeNet_Small_Quant()
     global_accuracy = []
     for i in range(1, global_rounds+1):
         global_params = global_model.get_params()
@@ -428,7 +429,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
             w.train_step(
                 model=w.model,
                 K=local_rounds,
-                B=32
+                B=64
             )
             local_params.append(w.get_params())
         agg = federated_learning.FedAvg(
@@ -667,7 +668,7 @@ if __name__ == '__main__':
     acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
     # np.savetxt("fl_mnist_no_mal.txt", np.array(acc))
     # acc = fl_dp(num_clients=20, global_rounds=200, local_rounds=5, noise=0.5)
-    np.savetxt("fl_mnist_mal.txt", np.array(acc))
+    np.savetxt("fl_cifar.txt", np.array(acc))
     # # acc = net.run()
     # plt.plot(acc)
     # plt.xlabel("Global rounds")
