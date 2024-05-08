@@ -345,12 +345,18 @@ class ZKFLChain(Network):
             )
 
 def fl_dp(num_clients, global_rounds, local_rounds, noise):
-    (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
-    for i in range(len(X_train)):
-            X_train[i] = X_train[i].reshape(-1, 28 * 28)
-            X_test = X_test.reshape(-1, 28 * 28)
-    X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
-    y_test = torch.tensor(y_test).long()
+    # (X_train, y_train), (X_test, y_test) = federated_learning.load_mnist(num_users=20)
+    # for i in range(len(X_train)):
+    #         X_train[i] = X_train[i].reshape(-1, 28 * 28)
+    #         X_test = X_test.reshape(-1, 28 * 28)
+    # X_test = torch.tensor(X_test.reshape(-1, 28 * 28)).float()
+    # y_test = torch.tensor(y_test).long()
+    (X_train, y_train), (X_test, y_test) = federated_learning.load_cifar10(num_users=num_clients,
+                                                                           n_class=10,
+                                                                           n_samples=250,
+                                                                           rate_unbalance=1.0,
+                                                                           )
+    X_test, y_test = torch.tensor(X_test).float(), torch.tensor(y_test).long()
     workers = []
     for i in range(num_clients):
         worker = Worker(index=i+1,
@@ -362,14 +368,14 @@ def fl_dp(num_clients, global_rounds, local_rounds, noise):
                         )
         workers.append(worker)
 
-    global_model = ShallowNet_Quant()
+    global_model = LeNet_Small_Quant()
     global_accuracy = []
     for i in range(1, global_rounds+1):
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         global_params = global_model.get_params()
         local_params = []
         for w in workers:
-            w.model = ShallowNet_Quant()
+            w.model = LeNet_Small_Quant()
             w.set_params(global_params)
             w.set_optimizer(torch.optim.SGD(w.model.parameters(), lr=0.001))
             w.train_step_dp(
@@ -425,7 +431,7 @@ def vanillia_fl(num_clients, global_rounds, local_rounds):
         local_params = []
         for w in workers:
             w.set_params(global_params)
-            w.set_optimizer(torch.optim.SGD(w.model.parameters(), lr=0.001))
+            w.set_optimizer(torch.optim.Adam(w.model.parameters(), lr=0.0001))
             w.train_step(
                 model=w.model,
                 K=local_rounds,
@@ -668,7 +674,7 @@ if __name__ == '__main__':
     acc = vanillia_fl(num_clients=20, global_rounds=200, local_rounds=5)
     # np.savetxt("fl_mnist_no_mal.txt", np.array(acc))
     # acc = fl_dp(num_clients=20, global_rounds=200, local_rounds=5, noise=0.5)
-    np.savetxt("fl_cifar.txt", np.array(acc))
+    np.savetxt("fl_cifar1.txt", np.array(acc))
     # # acc = net.run()
     # plt.plot(acc)
     # plt.xlabel("Global rounds")
